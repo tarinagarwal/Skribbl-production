@@ -17,6 +17,7 @@ const io = new Server(server, {
       /\.vercel\.app$/, // For Vercel deployments
       /\.netlify\.app$/, // For Netlify deployments
       /\.stackblitz\.io$/, // For StackBlitz
+      /\.tarinagarwal\.in$/,
     ],
     methods: ["GET", "POST"],
     credentials: true,
