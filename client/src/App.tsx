@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useSocket } from "./hooks/useSocket";
 import { Game, User, DrawingData, ChatMessage } from "./types/game";
 import JoinGame from "./components/JoinGame";
@@ -6,8 +6,18 @@ import GameLobby from "./components/GameLobby";
 import GameBoard from "./components/GameBoard";
 import GameFinished from "./components/GameFinished";
 
+// Get server URL from environment variable or default to production
+const getServerUrl = () => {
+  // In development, use local server
+  if (import.meta.env.DEV) {
+    return import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
+  }
+  // In production, use deployed server
+  return "https://skribbl-production.onrender.com";
+};
+
 function App() {
-  const socket = useSocket("http://localhost:3001");
+  const socket = useSocket(getServerUrl());
   const [game, setGame] = useState<Game | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -38,7 +48,7 @@ function App() {
 
   useEffect(() => {
     if (!socket) return;
-
+    //@ts-ignore
     socket.on("game-joined", (data) => {
       setCurrentUser(data.user);
     });
@@ -84,6 +94,7 @@ function App() {
       setMessages((prev) => [...prev, message]);
     });
 
+    //@ts-ignore
     socket.on("correct-guess", (data) => {
       setMessages((prev) => [
         ...prev,
@@ -109,6 +120,8 @@ function App() {
       ]);
     });
 
+    //@ts-ignore
+
     socket.on("word-choices", (data) => {
       setGame((prev) => {
         if (!prev) return prev;
@@ -121,6 +134,7 @@ function App() {
       });
     });
 
+    //@ts-ignore
     socket.on("word-selected", (data) => {
       setGame((prev) => {
         if (!prev) return prev;
@@ -133,7 +147,7 @@ function App() {
         };
       });
     });
-
+    //@ts-ignore
     socket.on("hint-update", (data) => {
       setGame((prev) => {
         if (!prev) return prev;
@@ -143,6 +157,8 @@ function App() {
         };
       });
     });
+
+    //@ts-ignore
     socket.on("player-left", (data) => {
       setMessages((prev) => [
         ...prev,

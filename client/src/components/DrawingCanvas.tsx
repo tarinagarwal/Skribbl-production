@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Palette, Eraser, Trash2, Undo } from "lucide-react";
+import { Palette, Eraser, Trash2 } from "lucide-react";
 import { DrawingData } from "../types/game";
 
 interface DrawingCanvasProps {

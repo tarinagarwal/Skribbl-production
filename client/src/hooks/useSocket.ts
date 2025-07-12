@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from "react";
+//@ts-ignore
 import { io, Socket } from "socket.io-client";
 
 export const useSocket = (serverUrl: string) => {
+  //@ts-ignore
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     console.log("Connecting to socket server:", serverUrl);
-    socketRef.current = io(serverUrl);
+    socketRef.current = io(serverUrl, {
+      transports: ["websocket", "polling"], // Fallback to polling if websocket fails
+      timeout: 20000, // 20 second timeout
+      forceNew: true, // Force new connection
+    });
 
     socketRef.current.on("connect", () => {
       console.log("Socket connected:", socketRef.current?.id);
@@ -18,7 +24,7 @@ export const useSocket = (serverUrl: string) => {
       console.log("Socket disconnected");
       setIsConnected(false);
     });
-
+    //@ts-ignore
     socketRef.current.on("connect_error", (error) => {
       console.error("Socket connection error:", error);
       setIsConnected(false);

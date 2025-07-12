@@ -10,13 +10,42 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: [
+      "http://localhost:5173", // For local development
+      "https://localhost:5173", // For local HTTPS
+      "https://skribbl-production.onrender.com", // Your deployed backend
+      /\.vercel\.app$/, // For Vercel deployments
+      /\.netlify\.app$/, // For Netlify deployments
+      /\.stackblitz\.io$/, // For StackBlitz
+    ],
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
 app.use(cors());
 app.use(express.json());
+
+// Health check endpoint for Render
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "OK",
+    message: "Skribbl server is running",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Basic route for testing
+app.get("/", (req, res) => {
+  res.json({
+    message: "Skribbl.io Server",
+    status: "Running",
+    endpoints: {
+      health: "/health",
+      socket: "Socket.IO connection available",
+    },
+  });
+});
 
 const gameManager = new GameManager();
 
