@@ -1,7 +1,7 @@
 {
   "redirects": [
     {
-      "source": "http://skribbl.tarinagarwal.in/(.*)",
+      "source": "/(.*)",
       "destination": "https://skribbl.tarinagarwal.in/$1",
       "permanent": true
     }
