@@ -51,46 +51,52 @@ const GameFinished: React.FC<GameFinishedProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-teal-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-teal-600 flex items-center justify-center p-4 sm:p-6">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="text-6xl mb-4">🎉</div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+          <div className="text-4xl sm:text-6xl mb-4">🎉</div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
             Game Finished!
           </h1>
-          <p className="text-gray-600">Final Results</p>
+          <p className="text-sm sm:text-base text-gray-600">Final Results</p>
         </div>
 
         <div className="space-y-4 mb-8">
           {sortedPlayers.map((player, index) => (
             <div
               key={player.id}
-              className={`flex items-center gap-4 p-4 rounded-lg ${
+              className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg ${
                 index === 0
                   ? "bg-gradient-to-r from-yellow-50 to-yellow-100 border-2 border-yellow-200"
                   : "bg-gray-50 border border-gray-200"
               }`}
             >
-              <div className="flex-shrink-0">{getPositionIcon(index)}</div>
+              <div className="flex-shrink-0">
+                {React.cloneElement(getPositionIcon(index), {
+                  size: window.innerWidth < 640 ? 20 : 24,
+                })}
+              </div>
 
               <img
                 src={player.avatar}
                 alt={`${player.name}'s avatar`}
-                className="w-12 h-12 rounded-full"
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full"
               />
 
               <div className="flex-1">
-                <div className="font-semibold text-gray-800">{player.name}</div>
-                <div className="text-sm text-gray-600">
+                <div className="font-semibold text-sm sm:text-base text-gray-800">
+                  {player.name}
+                </div>
+                <div className="text-xs sm:text-sm text-gray-600">
                   {getPositionText(index)}
                 </div>
               </div>
 
               <div className="text-right">
-                <div className="text-xl font-bold text-gray-800">
+                <div className="text-lg sm:text-xl font-bold text-gray-800">
                   {player.score}
                 </div>
-                <div className="text-sm text-gray-600">points</div>
+                <div className="text-xs sm:text-sm text-gray-600">points</div>
               </div>
             </div>
           ))}
@@ -100,7 +106,7 @@ const GameFinished: React.FC<GameFinishedProps> = ({
           {isOwner ? (
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-800 mb-2">
+                <h3 className="font-semibold text-sm sm:text-base text-blue-800 mb-2">
                   Ready Players ({game.playersReady?.length || 0}/
                   {game.players.length})
                 </h3>
@@ -110,44 +116,47 @@ const GameFinished: React.FC<GameFinishedProps> = ({
                       key={player.id}
                       className="flex items-center justify-between"
                     >
-                      <span className="text-sm text-blue-700">
+                      <span className="text-xs sm:text-sm text-blue-700">
                         {player.name}
                       </span>
                       {game.playersReady?.includes(player.id) ? (
-                        <Check size={16} className="text-green-500" />
+                        <Check
+                          size={14}
+                          className="sm:w-4 sm:h-4 text-green-500"
+                        />
                       ) : (
-                        <X size={16} className="text-red-500" />
+                        <X size={14} className="sm:w-4 sm:h-4 text-red-500" />
                       )}
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <button
                   onClick={() => onRestartGame && onRestartGame()}
                   disabled={!allPlayersReady}
-                  className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 flex items-center gap-2 justify-center ${
+                  className={`flex-1 px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 flex items-center gap-2 justify-center text-sm sm:text-base ${
                     allPlayersReady
                       ? "bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800"
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
                 >
-                  <Play size={20} />
+                  <Play size={16} className="sm:w-5 sm:h-5" />
                   Start New Game
                 </button>
 
                 <button
                   onClick={onPlayAgain}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-2"
+                  className="px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-2 text-sm sm:text-base"
                 >
-                  <RotateCcw size={20} />
+                  <RotateCcw size={16} className="sm:w-5 sm:h-5" />
                   New Room
                 </button>
               </div>
 
               {!allPlayersReady && (
-                <p className="text-sm text-gray-500">
+                <p className="text-xs sm:text-sm text-gray-500">
                   Waiting for all players to mark themselves ready...
                 </p>
               )}
@@ -155,7 +164,7 @@ const GameFinished: React.FC<GameFinishedProps> = ({
           ) : (
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-800 mb-2">
+                <h3 className="font-semibold text-sm sm:text-base text-blue-800 mb-2">
                   Ready Players ({game.playersReady?.length || 0}/
                   {game.players.length})
                 </h3>
@@ -165,25 +174,28 @@ const GameFinished: React.FC<GameFinishedProps> = ({
                       key={player.id}
                       className="flex items-center justify-between"
                     >
-                      <span className="text-sm text-blue-700">
+                      <span className="text-xs sm:text-sm text-blue-700">
                         {player.name}
                         {player.id === currentUser?.id && " (You)"}
                         {player.id === game.ownerId && " 👑"}
                       </span>
                       {game.playersReady?.includes(player.id) ? (
-                        <Check size={16} className="text-green-500" />
+                        <Check
+                          size={14}
+                          className="sm:w-4 sm:h-4 text-green-500"
+                        />
                       ) : (
-                        <X size={16} className="text-red-500" />
+                        <X size={14} className="sm:w-4 sm:h-4 text-red-500" />
                       )}
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <button
                   onClick={onToggleReady}
-                  className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 flex items-center gap-2 justify-center ${
+                  className={`flex-1 px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 flex items-center gap-2 justify-center text-sm sm:text-base ${
                     isReady
                       ? "bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800"
                       : "bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800"
@@ -191,12 +203,12 @@ const GameFinished: React.FC<GameFinishedProps> = ({
                 >
                   {isReady ? (
                     <>
-                      <X size={20} />
+                      <X size={16} className="sm:w-5 sm:h-5" />
                       Not Ready
                     </>
                   ) : (
                     <>
-                      <Check size={20} />
+                      <Check size={16} className="sm:w-5 sm:h-5" />
                       Ready
                     </>
                   )}
@@ -204,14 +216,14 @@ const GameFinished: React.FC<GameFinishedProps> = ({
 
                 <button
                   onClick={onPlayAgain}
-                  className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-2"
+                  className="px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-2 text-sm sm:text-base"
                 >
-                  <RotateCcw size={20} />
+                  <RotateCcw size={16} className="sm:w-5 sm:h-5" />
                   New Room
                 </button>
               </div>
 
-              <p className="text-sm text-gray-500">
+              <p className="text-xs sm:text-sm text-gray-500">
                 {isReady
                   ? "Waiting for room owner to start the game..."
                   : "Mark yourself ready to play again!"}
@@ -219,7 +231,9 @@ const GameFinished: React.FC<GameFinishedProps> = ({
             </div>
           )}
 
-          <p className="text-sm text-gray-500">Thanks for playing Skribbl!</p>
+          <p className="text-xs sm:text-sm text-gray-500">
+            Thanks for playing Skribbl!
+          </p>
         </div>
       </div>
     </div>

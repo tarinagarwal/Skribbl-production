@@ -43,19 +43,23 @@ const JoinGame: React.FC<JoinGameProps> = ({ onJoinGame, onCreateRoom }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-teal-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-teal-600 flex items-center justify-center p-4 sm:p-6">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="text-6xl mb-4">🎨</div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Skribbl</h1>
-          <p className="text-gray-600">Draw, guess, and have fun!</p>
+          <div className="text-4xl sm:text-6xl mb-4">🎨</div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
+            Skribbl
+          </h1>
+          <p className="text-sm sm:text-base text-gray-600">
+            Draw, guess, and have fun!
+          </p>
         </div>
 
         <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
           <button
             type="button"
             onClick={() => setMode("join")}
-            className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
+            className={`flex-1 py-2 px-2 sm:px-4 rounded-md font-medium transition-all text-sm sm:text-base ${
               mode === "join"
                 ? "bg-white text-purple-600 shadow-sm"
                 : "text-gray-600 hover:text-gray-800"
@@ -66,7 +70,7 @@ const JoinGame: React.FC<JoinGameProps> = ({ onJoinGame, onCreateRoom }) => {
           <button
             type="button"
             onClick={() => setMode("create")}
-            className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
+            className={`flex-1 py-2 px-2 sm:px-4 rounded-md font-medium transition-all text-sm sm:text-base ${
               mode === "create"
                 ? "bg-white text-purple-600 shadow-sm"
                 : "text-gray-600 hover:text-gray-800"
@@ -86,7 +90,7 @@ const JoinGame: React.FC<JoinGameProps> = ({ onJoinGame, onCreateRoom }) => {
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
               placeholder="Enter your name"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+              className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
               required
               maxLength={20}
             />
@@ -103,17 +107,17 @@ const JoinGame: React.FC<JoinGameProps> = ({ onJoinGame, onCreateRoom }) => {
                   value={roomCode}
                   onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
                   placeholder="Enter room code"
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all font-mono"
+                  className="flex-1 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all font-mono"
                   required
                   maxLength={6}
                 />
                 <button
                   type="button"
                   onClick={generateRoomCode}
-                  className="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                  className="px-3 sm:px-4 py-2 sm:py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
                   title="Generate random room code"
                 >
-                  <Users size={20} />
+                  <Users size={16} className="sm:w-5 sm:h-5" />
                 </button>
               </div>
             </div>
@@ -122,13 +126,13 @@ const JoinGame: React.FC<JoinGameProps> = ({ onJoinGame, onCreateRoom }) => {
           {mode === "create" && (
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-800">
+                <p className="text-xs sm:text-sm text-blue-800">
                   🎮 A new room will be created automatically with a random room
                   code that you can share with friends!
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Draw Time
@@ -136,7 +140,7 @@ const JoinGame: React.FC<JoinGameProps> = ({ onJoinGame, onCreateRoom }) => {
                   <select
                     value={drawTime}
                     onChange={(e) => setDrawTime(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     <option value={30}>30 seconds</option>
                     <option value={60}>60 seconds</option>
@@ -153,7 +157,7 @@ const JoinGame: React.FC<JoinGameProps> = ({ onJoinGame, onCreateRoom }) => {
                   <select
                     value={maxRounds}
                     onChange={(e) => setMaxRounds(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     <option value={2}>2 rounds</option>
                     <option value={3}>3 rounds</option>
@@ -168,23 +172,23 @@ const JoinGame: React.FC<JoinGameProps> = ({ onJoinGame, onCreateRoom }) => {
 
           <button
             type="submit"
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2"
+            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 sm:py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 text-sm sm:text-base"
           >
             {mode === "create" ? (
               <>
-                <Plus size={20} />
+                <Plus size={16} className="sm:w-5 sm:h-5" />
                 Create Room
               </>
             ) : (
               <>
-                <ArrowRight size={20} />
+                <ArrowRight size={16} className="sm:w-5 sm:h-5" />
                 Join Room
               </>
             )}
           </button>
         </form>
 
-        <div className="mt-8 text-center text-sm text-gray-500">
+        <div className="mt-6 sm:mt-8 text-center text-xs sm:text-sm text-gray-500">
           <p>
             {mode === "create"
               ? "Create a new room and invite friends!"
