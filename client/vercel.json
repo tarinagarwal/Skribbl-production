@@ -3,6 +3,12 @@
     {
       "source": "/(.*)",
       "destination": "https://skribbl.tarinagarwal.in/$1",
+      "has": [
+        {
+          "type": "protocol",
+          "value": "http"
+        }
+      ],
       "permanent": true
     }
   ],
