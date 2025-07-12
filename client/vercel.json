@@ -5,17 +5,15 @@
       "destination": "https://skribbl.tarinagarwal.in/$1",
       "has": [
         {
+          "type": "host",
+          "value": "skribbl.tarinagarwal.in"
+        },
+        {
           "type": "protocol",
           "value": "http"
         }
       ],
       "permanent": true
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/"
     }
   ]
 }
