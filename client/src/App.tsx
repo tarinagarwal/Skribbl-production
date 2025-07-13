@@ -13,9 +13,7 @@ const getServerUrl = () => {
     return import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
   }
   // In production, use deployed server
-  return (
-    import.meta.env.VITE_SERVER_URL || "https://skribbl-production.onrender.com"
-  );
+  return "https://skribbl-production.onrender.com";
 };
 
 function App() {
@@ -202,22 +200,13 @@ function App() {
       roomCode,
       playerName,
       socketConnected,
-      socketId: socket?.id,
-      serverUrl: getServerUrl(),
     });
     if (socket && socketConnected) {
       console.log("Emitting join-game event");
       socket.emit("join-game", { roomCode, playerName });
     } else {
-      console.error(
-        "Socket not connected. Connected:",
-        socketConnected,
-        "Socket exists:",
-        !!socket
-      );
-      alert(
-        "Connection error. Please wait a moment and try again, or refresh the page."
-      );
+      console.error("Socket not connected. Connected:", socketConnected);
+      alert("Connection error. Please refresh the page.");
     }
   };
 
@@ -236,15 +225,8 @@ function App() {
         settings: { drawTime: 80, maxRounds: 3 },
       });
     } else {
-      console.error(
-        "Socket not connected. Connected:",
-        socketConnected,
-        "Socket exists:",
-        !!socket
-      );
-      alert(
-        "Connection error. Please wait a moment and try again, or refresh the page."
-      );
+      console.error("Socket not connected. Connected:", socketConnected);
+      alert("Connection error. Please refresh the page.");
     }
   };
 
