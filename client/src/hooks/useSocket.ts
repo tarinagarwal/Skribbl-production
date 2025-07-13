@@ -10,9 +10,12 @@ export const useSocket = (serverUrl: string) => {
   useEffect(() => {
     console.log("Connecting to socket server:", serverUrl);
     socketRef.current = io(serverUrl, {
-      transports: ["websocket", "polling"], // Fallback to polling if websocket fails
+      transports: ["polling", "websocket"], // Try polling first for better compatibility
       timeout: 20000, // 20 second timeout
-      forceNew: true, // Force new connection
+      forceNew: false, // Don't force new connection
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
 
     socketRef.current.on("connect", () => {
@@ -26,10 +29,18 @@ export const useSocket = (serverUrl: string) => {
     });
     //@ts-ignore
     socketRef.current.on("connect_error", (error) => {
-      console.error("Socket connection error:", error);
+      console.error("Socket connection error:", error.message || error);
       setIsConnected(false);
     });
-
+    //@ts-ignore
+    socketRef.current.on("reconnect", (attemptNumber) => {
+      console.log("Socket reconnected after", attemptNumber, "attempts");
+      setIsConnected(true);
+    });
+    //@ts-ignore
+    socketRef.current.on("reconnect_error", (error) => {
+      console.error("Socket reconnection error:", error.message || error);
+    });
     return () => {
       if (socketRef.current) {
         console.log("Disconnecting socket");
@@ -37,7 +48,7 @@ export const useSocket = (serverUrl: string) => {
         socketRef.current.disconnect();
       }
     };
-  }, []); // Remove serverUrl dependency to prevent reconnections
+  }, [serverUrl]); // Include serverUrl dependency
 
   return socketRef.current;
 };

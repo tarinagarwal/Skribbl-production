@@ -92,6 +92,7 @@ const JoinGame: React.FC<JoinGameProps> = ({ onJoinGame, onCreateRoom }) => {
               className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
               required
               maxLength={20}
+              autoComplete="off"
             />
           </div>
 
@@ -109,6 +110,7 @@ const JoinGame: React.FC<JoinGameProps> = ({ onJoinGame, onCreateRoom }) => {
                   className="flex-1 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all font-mono"
                   required
                   maxLength={6}
+                  autoComplete="off"
                 />
                 <button
                   type="button"
