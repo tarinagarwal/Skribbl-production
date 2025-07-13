@@ -219,7 +219,11 @@ function App() {
       // Generate a random room code
       const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       console.log("Generated room code:", roomCode);
-      socket.emit("join-game", { roomCode, playerName, settings });
+      socket.emit("join-game", {
+        roomCode,
+        playerName,
+        settings: { drawTime: 80, maxRounds: 3 },
+      });
     } else {
       console.error("Socket not connected. Connected:", socketConnected);
       alert("Connection error. Please refresh the page.");

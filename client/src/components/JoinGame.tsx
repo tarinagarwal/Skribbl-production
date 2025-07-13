@@ -20,8 +20,7 @@ const JoinGame: React.FC<JoinGameProps> = ({ onJoinGame, onCreateRoom }) => {
     if (playerName.trim()) {
       if (mode === "create") {
         console.log("Creating room for player:", playerName.trim());
-        //@ts-ignore
-        onCreateRoom(playerName.trim(), { drawTime, maxRounds });
+        onCreateRoom(playerName.trim());
       } else if (mode === "join" && roomCode.trim()) {
         console.log(
           "Joining room:",
