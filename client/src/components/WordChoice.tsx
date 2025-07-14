@@ -16,12 +16,7 @@ const WordChoice: React.FC<WordChoiceProps> = ({
 }) => {
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (timeLeft <= 0 && !selectedWord && words.length > 0) {
-      // Auto-select first word if time runs out
-      onWordSelect(words[0]);
-    }
-  }, [timeLeft, selectedWord, words, onWordSelect]);
+  // Remove client-side auto-selection, let server handle it
 
   const handleWordSelect = (word: string) => {
     setSelectedWord(word);

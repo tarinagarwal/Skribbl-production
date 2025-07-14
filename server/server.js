@@ -337,6 +337,12 @@ io.on("connection", (socket) => {
         if (updatedGame) {
           io.to(gameId).emit("game-update", updatedGame);
         }
+
+        // Clear any running timers for disconnected players
+        if (updatedGame && updatedGame.players.length === 0) {
+          gameManager.clearGameTimers(gameId);
+        }
+
         break;
       }
     }

@@ -219,9 +219,8 @@ class GameManager {
     const game = this.games.get(gameId);
     if (!game) return;
 
-    // Set initial timestamp for accurate timing
-    const startTime = Date.now();
-    const duration = game.timeLeft * 1000; // Convert to milliseconds
+    // Use server-side countdown for accurate timing
+    let timeLeft = game.timeLeft;
 
     const timer = setInterval(async () => {
       const game = this.games.get(gameId);
@@ -231,14 +230,14 @@ class GameManager {
         return;
       }
 
-      // Calculate actual time left based on elapsed time
-      const elapsed = Date.now() - startTime;
-      const timeLeft = Math.max(0, Math.ceil((duration - elapsed) / 1000));
+      // Decrement server-side timer
+      timeLeft = Math.max(0, timeLeft - 1);
       game.timeLeft = timeLeft;
 
       // Emit time update
       if (io) {
         io.to(gameId).emit("game-update", game);
+        io.to(gameId).emit("timer-update", { timeLeft });
       }
 
       if (timeLeft <= 0) {
@@ -269,9 +268,8 @@ class GameManager {
     const game = this.games.get(gameId);
     if (!game) return;
 
-    // Set initial timestamp for accurate timing
-    const startTime = Date.now();
-    const duration = game.timeLeft * 1000; // Convert to milliseconds
+    // Use server-side countdown for accurate timing
+    let timeLeft = game.timeLeft;
 
     const timer = setInterval(async () => {
       const game = this.games.get(gameId);
@@ -281,14 +279,14 @@ class GameManager {
         return;
       }
 
-      // Calculate actual time left based on elapsed time
-      const elapsed = Date.now() - startTime;
-      const timeLeft = Math.max(0, Math.ceil((duration - elapsed) / 1000));
+      // Decrement server-side timer
+      timeLeft = Math.max(0, timeLeft - 1);
       game.timeLeft = timeLeft;
 
       // Emit time update
       if (io) {
         io.to(gameId).emit("game-update", game);
+        io.to(gameId).emit("timer-update", { timeLeft });
       }
 
       if (timeLeft <= 0) {

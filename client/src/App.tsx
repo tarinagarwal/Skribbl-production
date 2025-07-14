@@ -8,26 +8,26 @@ import GameBoard from "./components/GameBoard";
 import GameFinished from "./components/GameFinished";
 
 // Get server URL from environment variable or default to production
-// const getServerUrl = () => {
-//   // In development, use local server
-//   if (import.meta.env.DEV) {
-//     return import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
-//   }
-//   // In production, use deployed server
-//   return "https://skribbl-production.onrender.com";
-// };
-
 const getServerUrl = () => {
   // In development, use local server
   if (import.meta.env.DEV) {
-    return (
-      import.meta.env.VITE_SERVER_URL ||
-      "https://skribbl-production.onrender.com"
-    );
+    return import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
   }
   // In production, use deployed server
   return "https://skribbl-production.onrender.com";
 };
+
+// const getServerUrl = () => {
+//   // In development, use local server
+//   if (import.meta.env.DEV) {
+//     return (
+//       import.meta.env.VITE_SERVER_URL ||
+//       "https://skribbl-production.onrender.com"
+//     );
+//   }
+//   // In production, use deployed server
+//   return "https://skribbl-production.onrender.com";
+// };
 
 function App() {
   const socket = useSocket(getServerUrl());
@@ -193,6 +193,17 @@ function App() {
       setGameState("lobby");
       setMessages([]);
     });
+
+    socket.on("timer-update", (data: { timeLeft: number }) => {
+      setGame((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          timeLeft: data.timeLeft,
+        };
+      });
+    });
+
     return () => {
       socket.off("game-joined");
       socket.off("game-update");
@@ -207,6 +218,7 @@ function App() {
       socket.off("hint-update");
       socket.off("player-left");
       socket.off("game-restarted");
+      socket.off("timer-update");
     };
   }, [socket]);
 

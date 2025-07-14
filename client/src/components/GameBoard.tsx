@@ -25,19 +25,10 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(
     messages,
     onWordSelect,
   }) => {
-    const [timeLeft, setTimeLeft] = useState(game.timeLeft);
     const isDrawer = currentUser?.id === game.currentDrawer?.id;
 
-    useEffect(() => {
-      setTimeLeft(game.timeLeft);
-    }, [game.timeLeft]);
-
-    useEffect(() => {
-      if (timeLeft > 0) {
-        const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-        return () => clearTimeout(timer);
-      }
-    }, [timeLeft]);
+    // Use server-provided time directly
+    const timeLeft = game.timeLeft;
 
     const getWordDisplay = () => {
       if (isDrawer) {
