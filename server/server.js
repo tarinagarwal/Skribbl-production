@@ -178,9 +178,16 @@ io.on("connection", (socket) => {
     const { gameId, drawingData } = data;
     const game = gameManager.getGame(gameId);
 
-    if (game && game.currentDrawer && game.currentDrawer.id === socket.id) {
+    if (
+      game &&
+      game.currentDrawer &&
+      game.currentDrawer.id === socket.id &&
+      game.status === "playing"
+    ) {
       game.drawingData.push(drawingData);
+      // Broadcast to all other players in the room
       socket.to(gameId).emit("drawing", drawingData);
+      console.log(`Drawing data broadcasted to room ${gameId}:`, drawingData);
     }
   });
 
@@ -188,9 +195,16 @@ io.on("connection", (socket) => {
     const { gameId } = data;
     const game = gameManager.getGame(gameId);
 
-    if (game && game.currentDrawer && game.currentDrawer.id === socket.id) {
+    if (
+      game &&
+      game.currentDrawer &&
+      game.currentDrawer.id === socket.id &&
+      game.status === "playing"
+    ) {
       game.drawingData = [];
+      // Broadcast clear to all other players in the room
       socket.to(gameId).emit("clear-canvas");
+      console.log(`Canvas cleared for room ${gameId}`);
     }
   });
 

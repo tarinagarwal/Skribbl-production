@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useCallback } from "react";
 import { useSocket } from "./hooks/useSocket";
 import { Game, User, DrawingData, ChatMessage } from "./types/game";
 import JoinGame from "./components/JoinGame";
@@ -83,6 +84,7 @@ function App() {
     });
 
     socket.on("drawing", (drawingData: DrawingData) => {
+      console.log("Received drawing data:", drawingData);
       setGame((prev) => {
         if (!prev) return prev;
         return {
@@ -93,6 +95,7 @@ function App() {
     });
 
     socket.on("clear-canvas", () => {
+      console.log("Received clear canvas event");
       setGame((prev) => {
         if (!prev) return prev;
         return {
@@ -248,29 +251,38 @@ function App() {
     }
   };
 
-  const handleDraw = (drawingData: DrawingData) => {
-    if (socket && game) {
-      socket.emit("drawing", { gameId: game.id, drawingData });
-    }
-  };
+  const handleDraw = useCallback(
+    (drawingData: DrawingData) => {
+      if (socket && game) {
+        socket.emit("drawing", { gameId: game.id, drawingData });
+      }
+    },
+    [socket, game]
+  );
 
-  const handleClearCanvas = () => {
+  const handleClearCanvas = useCallback(() => {
     if (socket && game) {
       socket.emit("clear-canvas", { gameId: game.id });
     }
-  };
+  }, [socket, game]);
 
-  const handleSendMessage = (message: string) => {
-    if (socket && game) {
-      socket.emit("chat-message", { gameId: game.id, message });
-    }
-  };
+  const handleSendMessage = useCallback(
+    (message: string) => {
+      if (socket && game) {
+        socket.emit("chat-message", { gameId: game.id, message });
+      }
+    },
+    [socket, game]
+  );
 
-  const handleWordSelect = (word: string) => {
-    if (socket && game) {
-      socket.emit("word-select", { gameId: game.id, word });
-    }
-  };
+  const handleWordSelect = useCallback(
+    (word: string) => {
+      if (socket && game) {
+        socket.emit("word-select", { gameId: game.id, word });
+      }
+    },
+    [socket, game]
+  );
   const handlePlayAgain = () => {
     setGame(null);
     setCurrentUser(null);
