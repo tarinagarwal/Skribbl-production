@@ -50,7 +50,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(
           .split("")
           .map((char) => {
             if (char === " ") {
-              return "   "; // Three spaces to make it more visible
+              return "     "; // 5 spaces for word separation
             }
             return "_";
           })
@@ -125,7 +125,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(
                       ? "You are drawing"
                       : `${game.currentDrawer?.name} is drawing`}
                   </div>
-                  <div className="text-lg sm:text-xl font-bold text-gray-800 font-mono">
+                  <div className="text-lg sm:text-xl font-bold text-gray-800 font-mono whitespace-pre">
                     {getWordDisplay()}
                   </div>
                 </div>

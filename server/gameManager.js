@@ -129,9 +129,15 @@ class GameManager {
       game.wordChoices = null;
       game.gamePhase = "drawing";
       game.timeLeft = game.drawTime;
+      // Create proper spacing for words with spaces
       game.hints = word
         .split("")
-        .map(() => "_")
+        .map((char) => {
+          if (char === " ") {
+            return "     "; // 5 spaces to create visible gap
+          }
+          return "_";
+        })
         .join(" ");
 
       await db.sql`UPDATE games SET current_word = ${word} WHERE id = ${gameId}`;
@@ -370,7 +376,9 @@ class GameManager {
         const hints = word
           .split("")
           .map((char, index) => {
-            if (char === " ") return " ";
+            if (char === " ") {
+              return "     "; // 5 spaces to create visible gap
+            }
             return shuffledPositions.slice(0, hintsRevealed).includes(index)
               ? char
               : "_";
