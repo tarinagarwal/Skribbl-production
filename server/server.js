@@ -222,6 +222,12 @@ io.on("connection", (socket) => {
             message
           );
 
+          // Filter the message to hide the current word
+          const filteredMessage = gameManager.filterChatMessage(
+            message,
+            game.currentWord
+          );
+
           if (isCorrect && user.id !== game.currentDrawer.id) {
             // Send correct guess notification only to drawer and players who have guessed correctly
             const correctGuessMessage = {
@@ -254,57 +260,19 @@ io.on("connection", (socket) => {
                 }
               }, 3000);
             }
-          } else if (!isCorrect && user.id !== game.currentDrawer?.id) {
-            // Send chat message to players who haven't guessed correctly
+          } else {
+            // Send filtered chat message to all players
             await gameManager.saveMessage(gameId, socket.id, message);
 
             const chatMessage = {
               userId: socket.id,
               userName: user.name,
-              message,
+              message: filteredMessage, // Use filtered message
               timestamp: new Date().toISOString(),
             };
 
-            // Send to players who haven't guessed correctly
-            game.players.forEach((player) => {
-              if (!player.hasGuessed && player.id !== game.currentDrawer?.id) {
-                io.to(player.id).emit("chat-message", chatMessage);
-              }
-            });
-          } else if (user.id === game.currentDrawer?.id) {
-            // Drawer's message - only visible to players who have guessed correctly
-            await gameManager.saveMessage(gameId, socket.id, message);
-
-            const chatMessage = {
-              userId: socket.id,
-              userName: user.name,
-              message,
-              timestamp: new Date().toISOString(),
-            };
-
-            // Send to players who have guessed correctly
-            game.players.forEach((player) => {
-              if (player.hasGuessed || player.id === game.currentDrawer?.id) {
-                io.to(player.id).emit("chat-message", chatMessage);
-              }
-            });
-          } else if (user.hasGuessed) {
-            // Player who has guessed correctly - visible to drawer and other correct guessers
-            await gameManager.saveMessage(gameId, socket.id, message);
-
-            const chatMessage = {
-              userId: socket.id,
-              userName: user.name,
-              message,
-              timestamp: new Date().toISOString(),
-            };
-
-            // Send to drawer and players who have guessed correctly
-            game.players.forEach((player) => {
-              if (player.hasGuessed || player.id === game.currentDrawer?.id) {
-                io.to(player.id).emit("chat-message", chatMessage);
-              }
-            });
+            // Send filtered message to all players
+            io.to(gameId).emit("chat-message", chatMessage);
           }
 
           io.to(gameId).emit("game-update", game);

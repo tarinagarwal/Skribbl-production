@@ -161,6 +161,19 @@ class GameManager {
       // Clear existing timers
       this.clearGameTimers(gameId);
 
+      // Show round end screen before proceeding
+      if (io) {
+        io.to(gameId).emit("round-end", {
+          word: game.currentWord,
+          drawer: game.currentDrawer?.name,
+          round: game.round,
+          maxRounds: game.maxRounds,
+        });
+      }
+
+      // Wait 3 seconds before proceeding to next turn
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
       // Handle case where currentDrawer might be null (e.g., after restart)
       let currentDrawerIndex = -1;
       if (game.currentDrawer && game.currentDrawer.id) {
@@ -388,6 +401,20 @@ class GameManager {
       clearInterval(this.hintTimers.get(gameId));
       this.hintTimers.delete(gameId);
     }
+  }
+
+  // Filter chat messages to hide the current word
+  filterChatMessage(message, currentWord) {
+    if (!currentWord) return message;
+
+    // Create a regex that matches the word (case insensitive, whole word)
+    const wordRegex = new RegExp(
+      `\\b${currentWord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
+      "gi"
+    );
+
+    // Replace the word with asterisks
+    return message.replace(wordRegex, (match) => "*".repeat(match.length));
   }
 
   async checkGuess(gameId, userId, guess) {

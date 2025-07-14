@@ -4,6 +4,7 @@ import { Game, User, DrawingData, ChatMessage } from "../types/game";
 import DrawingCanvas from "./DrawingCanvas";
 import ChatBox from "./ChatBox";
 import WordChoice from "./WordChoice";
+import RoundEndScreen from "./RoundEndScreen";
 
 interface GameBoardProps {
   game: Game;
@@ -13,6 +14,8 @@ interface GameBoardProps {
   onSendMessage: (message: string) => void;
   messages: ChatMessage[];
   onWordSelect?: (word: string) => void;
+  showRoundEnd?: boolean;
+  onRoundEndContinue?: () => void;
 }
 
 const GameBoard: React.FC<GameBoardProps> = React.memo(
@@ -24,6 +27,8 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(
     onSendMessage,
     messages,
     onWordSelect,
+    showRoundEnd = false,
+    onRoundEndContinue,
   }) => {
     const isDrawer = currentUser?.id === game.currentDrawer?.id;
 
@@ -40,9 +45,15 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(
       }
 
       if (game.currentWord && game.gamePhase === "drawing") {
+        // Show proper spacing for words with spaces
         return game.currentWord
           .split("")
-          .map((char) => (char === " " ? " " : "_"))
+          .map((char) => {
+            if (char === " ") {
+              return "   "; // Three spaces to make it more visible
+            }
+            return "_";
+          })
           .join(" ");
       }
 
@@ -53,6 +64,20 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(
 
     return (
       <>
+        {showRoundEnd &&
+          game.currentWord &&
+          game.currentDrawer &&
+          onRoundEndContinue && (
+            <RoundEndScreen
+              word={game.currentWord}
+              drawer={game.currentDrawer.name}
+              timeLeft={timeLeft}
+              round={game.round}
+              maxRounds={game.maxRounds}
+              onContinue={onRoundEndContinue}
+            />
+          )}
+
         {game.gamePhase === "choosing" && game.wordChoices && onWordSelect && (
           <WordChoice
             words={game.wordChoices}

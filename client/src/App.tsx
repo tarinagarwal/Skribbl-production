@@ -38,6 +38,7 @@ function App() {
     "join" | "lobby" | "playing" | "finished"
   >("join");
   const [socketConnected, setSocketConnected] = useState(false);
+  const [showRoundEnd, setShowRoundEnd] = useState(false);
 
   // Monitor socket connection status
   useEffect(() => {
@@ -121,9 +122,14 @@ function App() {
         },
       ]);
     });
+    //@ts-ignore
+    socket.on("round-end", (data) => {
+      setShowRoundEnd(true);
+    });
 
     socket.on("next-turn", (gameData: Game) => {
       setGame(gameData);
+      setShowRoundEnd(false); // Hide round end screen when next turn starts
       setMessages((prev) => [
         ...prev,
         {
@@ -192,6 +198,7 @@ function App() {
       setGame(gameData);
       setGameState("lobby");
       setMessages([]);
+      setShowRoundEnd(false);
     });
 
     socket.on("timer-update", (data: { timeLeft: number }) => {
@@ -219,6 +226,7 @@ function App() {
       socket.off("player-left");
       socket.off("game-restarted");
       socket.off("timer-update");
+      socket.off("round-end");
     };
   }, [socket]);
 
@@ -300,6 +308,7 @@ function App() {
     setCurrentUser(null);
     setMessages([]);
     setGameState("join");
+    setShowRoundEnd(false);
   };
 
   const handleRestartGame = (settings?: {
@@ -316,6 +325,11 @@ function App() {
       socket.emit("toggle-ready", { gameId: game.id });
     }
   };
+
+  const handleRoundEndContinue = () => {
+    setShowRoundEnd(false);
+  };
+
   if (gameState === "join") {
     return (
       <JoinGame onJoinGame={handleJoinGame} onCreateRoom={handleCreateRoom} />
@@ -342,6 +356,8 @@ function App() {
         onSendMessage={handleSendMessage}
         messages={messages}
         onWordSelect={handleWordSelect}
+        showRoundEnd={showRoundEnd}
+        onRoundEndContinue={handleRoundEndContinue}
       />
     );
   }
