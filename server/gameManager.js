@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import { getDatabase } from "./database.js";
+import { getDatabase, checkDatabaseHealth } from "./database.js";
 
 class GameManager {
   constructor() {
@@ -9,181 +9,208 @@ class GameManager {
   }
 
   async createGame(roomCode, settings = {}) {
-    const db = getDatabase();
-    const gameId = uuidv4();
-    const { drawTime = 80, maxRounds = 3 } = settings;
-    let ownerId = null;
+    try {
+      const db = getDatabase();
+      const gameId = uuidv4();
+      const { drawTime = 80, maxRounds = 3 } = settings;
+      let ownerId = null;
 
-    await db.sql`INSERT INTO games (id, room_code, max_rounds, owner_id) VALUES (${gameId}, ${roomCode}, ${maxRounds}, ${ownerId})`;
+      await db.sql`INSERT INTO games (id, room_code, max_rounds, owner_id) VALUES (${gameId}, ${roomCode}, ${maxRounds}, ${ownerId})`;
 
-    this.games.set(gameId, {
-      id: gameId,
-      roomCode,
-      ownerId: null, // Will be set when first player joins
-      players: [],
-      playersReady: [],
-      currentWord: null,
-      wordChoices: null,
-      currentDrawer: null,
-      round: 1,
-      maxRounds,
-      drawTime,
-      status: "waiting",
-      gamePhase: "drawing",
-      timeLeft: 0,
-      drawingData: [],
-      hints: "",
-    });
+      this.games.set(gameId, {
+        id: gameId,
+        roomCode,
+        ownerId: null, // Will be set when first player joins
+        players: [],
+        playersReady: [],
+        currentWord: null,
+        wordChoices: null,
+        currentDrawer: null,
+        round: 1,
+        maxRounds,
+        drawTime,
+        status: "waiting",
+        gamePhase: "drawing",
+        timeLeft: 0,
+        drawingData: [],
+        hints: "",
+      });
 
-    return gameId;
+      return gameId;
+    } catch (error) {
+      console.error("Error creating game:", error);
+      throw new Error("Failed to create game. Database connection issue.");
+    }
   }
 
   async joinGame(gameId, user) {
-    const db = getDatabase();
-    const game = this.games.get(gameId);
-    if (!game) return null;
+    try {
+      const db = getDatabase();
+      const game = this.games.get(gameId);
+      if (!game) return null;
 
-    // Set first player as owner
-    if (!game.ownerId && game.players.length === 0) {
-      game.ownerId = user.id;
-      await db.sql`UPDATE games SET owner_id = ${user.id} WHERE id = ${gameId}`;
+      // Set first player as owner
+      if (!game.ownerId && game.players.length === 0) {
+        game.ownerId = user.id;
+        await db.sql`UPDATE games SET owner_id = ${user.id} WHERE id = ${gameId}`;
+      }
+
+      // Add user to database
+      await db.sql`INSERT OR REPLACE INTO users (id, name, avatar) VALUES (${
+        user.id
+      }, ${user.name}, ${user.avatar || ""})`;
+
+      // Add player to game
+      await db.sql`INSERT OR REPLACE INTO game_players (game_id, user_id, score) VALUES (${gameId}, ${
+        user.id
+      }, ${0})`;
+
+      const existingPlayer = game.players.find((p) => p.id === user.id);
+      if (!existingPlayer) {
+        game.players.push({
+          ...user,
+          score: 0,
+          isDrawer: false,
+          hasGuessed: false,
+        });
+      }
+
+      return game;
+    } catch (error) {
+      console.error("Error joining game:", error);
+      throw new Error("Failed to join game. Database connection issue.");
     }
-
-    // Add user to database
-    await db.sql`INSERT OR REPLACE INTO users (id, name, avatar) VALUES (${
-      user.id
-    }, ${user.name}, ${user.avatar || ""})`;
-
-    // Add player to game
-    await db.sql`INSERT OR REPLACE INTO game_players (game_id, user_id, score) VALUES (${gameId}, ${
-      user.id
-    }, ${0})`;
-
-    const existingPlayer = game.players.find((p) => p.id === user.id);
-    if (!existingPlayer) {
-      game.players.push({
-        ...user,
-        score: 0,
-        isDrawer: false,
-        hasGuessed: false,
-      });
-    }
-
-    return game;
   }
 
   async startGame(gameId, io) {
-    const db = getDatabase();
-    const game = this.games.get(gameId);
-    if (!game || game.players.length < 2) return null;
+    try {
+      const db = getDatabase();
+      const game = this.games.get(gameId);
+      if (!game || game.players.length < 2) return null;
 
-    // Reset all players' guess status
-    game.players.forEach((player) => {
-      player.hasGuessed = false;
-    });
+      // Reset all players' guess status
+      game.players.forEach((player) => {
+        player.hasGuessed = false;
+      });
 
-    game.status = "playing";
-    game.currentDrawer = game.players[0];
+      game.status = "playing";
+      game.currentDrawer = game.players[0];
 
-    // Get 3 random words for choice
-    const randomWords =
-      await db.sql`SELECT word FROM words ORDER BY RANDOM() LIMIT 3`;
-    game.wordChoices = randomWords.map((row) => row.word);
-    game.gamePhase = "choosing";
-    game.timeLeft = 10; // 10 seconds to choose
-    game.hints = "";
+      // Get 3 random words for choice
+      const randomWords =
+        await db.sql`SELECT word FROM words ORDER BY RANDOM() LIMIT 3`;
+      game.wordChoices = randomWords.map((row) => row.word);
+      game.gamePhase = "choosing";
+      game.timeLeft = 10; // 10 seconds to choose
+      game.hints = "";
 
-    await db.sql`UPDATE games SET status = ${game.status}, current_drawer = ${game.currentDrawer.id} WHERE id = ${gameId}`;
+      await db.sql`UPDATE games SET status = ${game.status}, current_drawer = ${game.currentDrawer.id} WHERE id = ${gameId}`;
 
-    // Send word choices to drawer (only if io is provided)
-    if (io) {
-      io.to(gameId).emit("word-choices", { words: game.wordChoices });
-      this.startChoiceTimer(gameId, io);
+      // Send word choices to drawer (only if io is provided)
+      if (io) {
+        io.to(gameId).emit("word-choices", { words: game.wordChoices });
+        this.startChoiceTimer(gameId, io);
+      }
+
+      return game;
+    } catch (error) {
+      console.error("Error starting game:", error);
+      throw new Error("Failed to start game. Database connection issue.");
     }
-
-    return game;
   }
 
   async selectWord(gameId, word, io) {
-    const db = getDatabase();
-    const game = this.games.get(gameId);
-    if (!game) return null;
+    try {
+      const db = getDatabase();
+      const game = this.games.get(gameId);
+      if (!game) return null;
 
-    game.currentWord = word;
-    game.wordChoices = null;
-    game.gamePhase = "drawing";
-    game.timeLeft = game.drawTime;
-    game.hints = word
-      .split("")
-      .map(() => "_")
-      .join(" ");
+      game.currentWord = word;
+      game.wordChoices = null;
+      game.gamePhase = "drawing";
+      game.timeLeft = game.drawTime;
+      game.hints = word
+        .split("")
+        .map(() => "_")
+        .join(" ");
 
-    await db.sql`UPDATE games SET current_word = ${word} WHERE id = ${gameId}`;
+      await db.sql`UPDATE games SET current_word = ${word} WHERE id = ${gameId}`;
 
-    // Clear choice timer
-    this.clearChoiceTimer(gameId);
+      // Clear choice timer
+      this.clearChoiceTimer(gameId);
 
-    if (io) {
-      io.to(gameId).emit("word-selected", { word });
-      this.startDrawTimer(gameId, io);
-      this.startHintTimer(gameId, io);
+      if (io) {
+        io.to(gameId).emit("word-selected", { word });
+        this.startDrawTimer(gameId, io);
+        this.startHintTimer(gameId, io);
+      }
+
+      return game;
+    } catch (error) {
+      console.error("Error selecting word:", error);
+      throw new Error("Failed to select word. Database connection issue.");
     }
-
-    return game;
   }
 
   async nextTurn(gameId, io) {
-    const db = getDatabase();
-    const game = this.games.get(gameId);
-    if (!game) return null;
+    try {
+      const db = getDatabase();
+      const game = this.games.get(gameId);
+      if (!game) return null;
 
-    // Clear existing timers
-    this.clearGameTimers(gameId);
+      // Clear existing timers
+      this.clearGameTimers(gameId);
 
-    // Handle case where currentDrawer might be null (e.g., after restart)
-    let currentDrawerIndex = -1;
-    if (game.currentDrawer && game.currentDrawer.id) {
-      currentDrawerIndex = game.players.findIndex(
-        (p) => p.id === game.currentDrawer.id
+      // Handle case where currentDrawer might be null (e.g., after restart)
+      let currentDrawerIndex = -1;
+      if (game.currentDrawer && game.currentDrawer.id) {
+        currentDrawerIndex = game.players.findIndex(
+          (p) => p.id === game.currentDrawer.id
+        );
+      }
+
+      // If currentDrawer not found or null, start from beginning
+      if (currentDrawerIndex === -1) {
+        currentDrawerIndex = -1; // Will become 0 after increment
+      }
+
+      const nextDrawerIndex = (currentDrawerIndex + 1) % game.players.length;
+
+      if (nextDrawerIndex === 0) {
+        game.round++;
+        if (game.round > game.maxRounds) {
+          game.status = "finished";
+          // Owner is automatically ready when game finishes
+          game.playersReady = [game.ownerId];
+          await db.sql`UPDATE games SET status = ${"finished"} WHERE id = ${gameId}`;
+          return game;
+        }
+      }
+
+      this.resetGuessStatus(game);
+
+      game.currentDrawer = game.players[nextDrawerIndex];
+      const randomWords =
+        await db.sql`SELECT word FROM words ORDER BY RANDOM() LIMIT 3`;
+      game.wordChoices = randomWords.map((row) => row.word);
+      game.currentWord = null;
+      game.gamePhase = "choosing";
+      game.timeLeft = 10;
+      game.drawingData = [];
+      game.hints = "";
+
+      await db.sql`UPDATE games SET current_drawer = ${game.currentDrawer.id}, round = ${game.round} WHERE id = ${gameId}`;
+
+      io.to(gameId).emit("word-choices", { words: game.wordChoices });
+      this.startChoiceTimer(gameId, io);
+
+      return game;
+    } catch (error) {
+      console.error("Error in next turn:", error);
+      throw new Error(
+        "Failed to proceed to next turn. Database connection issue."
       );
     }
-
-    // If currentDrawer not found or null, start from beginning
-    if (currentDrawerIndex === -1) {
-      currentDrawerIndex = -1; // Will become 0 after increment
-    }
-
-    const nextDrawerIndex = (currentDrawerIndex + 1) % game.players.length;
-
-    if (nextDrawerIndex === 0) {
-      game.round++;
-      if (game.round > game.maxRounds) {
-        game.status = "finished";
-        // Owner is automatically ready when game finishes
-        game.playersReady = [game.ownerId];
-        await db.sql`UPDATE games SET status = ${"finished"} WHERE id = ${gameId}`;
-        return game;
-      }
-    }
-
-    this.resetGuessStatus(game);
-
-    game.currentDrawer = game.players[nextDrawerIndex];
-    const randomWords =
-      await db.sql`SELECT word FROM words ORDER BY RANDOM() LIMIT 3`;
-    game.wordChoices = randomWords.map((row) => row.word);
-    game.currentWord = null;
-    game.gamePhase = "choosing";
-    game.timeLeft = 10;
-    game.drawingData = [];
-    game.hints = "";
-
-    await db.sql`UPDATE games SET current_drawer = ${game.currentDrawer.id}, round = ${game.round} WHERE id = ${gameId}`;
-
-    io.to(gameId).emit("word-choices", { words: game.wordChoices });
-    this.startChoiceTimer(gameId, io);
-
-    return game;
   }
 
   startChoiceTimer(gameId, io) {
@@ -219,7 +246,11 @@ class GameManager {
         this.timers.delete(gameId + "_choice");
         // Auto-select first word if time runs out
         if (game.wordChoices && game.wordChoices.length > 0) {
-          await this.selectWord(gameId, game.wordChoices[0], io);
+          try {
+            await this.selectWord(gameId, game.wordChoices[0], io);
+          } catch (error) {
+            console.error("Error auto-selecting word:", error);
+          }
         }
       }
     }, 1000);
@@ -264,11 +295,15 @@ class GameManager {
         clearInterval(timer);
         this.timers.delete(gameId + "_draw");
         this.resetGuessStatus(game);
-        await this.nextTurn(gameId, io);
-        const updatedGame = this.games.get(gameId);
-        if (io) {
-          io.to(gameId).emit("next-turn", updatedGame);
-          io.to(gameId).emit("game-update", updatedGame);
+        try {
+          await this.nextTurn(gameId, io);
+          const updatedGame = this.games.get(gameId);
+          if (io) {
+            io.to(gameId).emit("next-turn", updatedGame);
+            io.to(gameId).emit("game-update", updatedGame);
+          }
+        } catch (error) {
+          console.error("Error in draw timer next turn:", error);
         }
       }
     }, 1000);
@@ -358,45 +393,52 @@ class GameManager {
   }
 
   async checkGuess(gameId, userId, guess) {
-    const db = getDatabase();
-    const game = this.games.get(gameId);
-    if (!game || !game.currentWord || game.gamePhase !== "drawing")
-      return false;
+    try {
+      const db = getDatabase();
+      const game = this.games.get(gameId);
+      if (!game || !game.currentWord || game.gamePhase !== "drawing")
+        return false;
 
-    // Don't allow drawer to guess
-    if (game.currentDrawer && game.currentDrawer.id === userId) return false;
+      // Don't allow drawer to guess
+      if (game.currentDrawer && game.currentDrawer.id === userId) return false;
 
-    const isCorrect =
-      guess.toLowerCase().trim() === game.currentWord.toLowerCase();
+      const isCorrect =
+        guess.toLowerCase().trim() === game.currentWord.toLowerCase();
 
-    if (isCorrect) {
-      const player = game.players.find((p) => p.id === userId);
-      if (player) {
-        // Calculate points based on time left (more time = more points)
-        const basePoints = 100;
-        const timeBonus = Math.floor((game.timeLeft / game.drawTime) * 50);
-        const points = Math.max(10, basePoints + timeBonus);
-        player.score += points;
+      if (isCorrect) {
+        const player = game.players.find((p) => p.id === userId);
+        if (player) {
+          // Calculate points based on time left (more time = more points)
+          const basePoints = 100;
+          const timeBonus = Math.floor((game.timeLeft / game.drawTime) * 50);
+          const points = Math.max(10, basePoints + timeBonus);
+          player.score += points;
 
-        // Update score in database
-        await db.sql`UPDATE game_players SET score = ${player.score} WHERE game_id = ${gameId} AND user_id = ${userId}`;
+          // Update score in database
+          await db.sql`UPDATE game_players SET score = ${player.score} WHERE game_id = ${gameId} AND user_id = ${userId}`;
 
-        // Give points to drawer for each correct guess
-        const drawer = game.players.find((p) => p.id === game.currentDrawer.id);
-        if (drawer) {
-          drawer.score += 25; // Drawer gets points for each correct guess
-          await db.sql`UPDATE game_players SET score = ${drawer.score} WHERE game_id = ${gameId} AND user_id = ${game.currentDrawer.id}`;
+          // Give points to drawer for each correct guess
+          const drawer = game.players.find(
+            (p) => p.id === game.currentDrawer.id
+          );
+          if (drawer) {
+            drawer.score += 25; // Drawer gets points for each correct guess
+            await db.sql`UPDATE game_players SET score = ${drawer.score} WHERE game_id = ${gameId} AND user_id = ${game.currentDrawer.id}`;
+          }
+
+          // Mark player as having guessed correctly
+          player.hasGuessed = true;
         }
-
-        // Mark player as having guessed correctly
-        player.hasGuessed = true;
       }
+
+      // Save message to database
+      await db.sql`INSERT INTO chat_messages (game_id, user_id, message, is_guess) VALUES (${gameId}, ${userId}, ${guess}, ${1})`;
+
+      return isCorrect;
+    } catch (error) {
+      console.error("Error checking guess:", error);
+      return false; // Return false on error to prevent game breaking
     }
-
-    // Save message to database
-    await db.sql`INSERT INTO chat_messages (game_id, user_id, message, is_guess) VALUES (${gameId}, ${userId}, ${guess}, ${1})`;
-
-    return isCorrect;
   }
 
   // Check if all non-drawer players have guessed correctly
@@ -418,8 +460,13 @@ class GameManager {
   }
 
   async saveMessage(gameId, userId, message) {
-    const db = getDatabase();
-    await db.sql`INSERT INTO chat_messages (game_id, user_id, message) VALUES (${gameId}, ${userId}, ${message})`;
+    try {
+      const db = getDatabase();
+      await db.sql`INSERT INTO chat_messages (game_id, user_id, message) VALUES (${gameId}, ${userId}, ${message})`;
+    } catch (error) {
+      console.error("Error saving message:", error);
+      // Don't throw error to prevent chat from breaking
+    }
   }
 
   getGame(gameId) {
@@ -427,52 +474,57 @@ class GameManager {
   }
 
   async getGameByRoomCode(roomCode) {
-    const db = getDatabase();
-    const gameDataResult =
-      await db.sql`SELECT * FROM games WHERE room_code = ${roomCode} ORDER BY created_at DESC LIMIT 1`;
-    const gameData = gameDataResult[0] || null;
+    try {
+      const db = getDatabase();
+      const gameDataResult =
+        await db.sql`SELECT * FROM games WHERE room_code = ${roomCode} ORDER BY created_at DESC LIMIT 1`;
+      const gameData = gameDataResult[0] || null;
 
-    if (!gameData) return null;
+      if (!gameData) return null;
 
-    if (!this.games.has(gameData.id)) {
-      // Restore game from database
-      const players = await db.sql`
-        SELECT u.id, u.name, u.avatar, gp.score 
-        FROM users u 
-        JOIN game_players gp ON u.id = gp.user_id 
-        WHERE gp.game_id = ${gameData.id}
-      `;
+      if (!this.games.has(gameData.id)) {
+        // Restore game from database
+        const players = await db.sql`
+          SELECT u.id, u.name, u.avatar, gp.score 
+          FROM users u 
+          JOIN game_players gp ON u.id = gp.user_id 
+          WHERE gp.game_id = ${gameData.id}
+        `;
 
-      this.games.set(gameData.id, {
-        id: gameData.id,
-        roomCode: gameData.room_code,
-        ownerId: gameData.owner_id,
-        players: players.map((p) => ({
-          ...p,
-          isDrawer: p.id === gameData.current_drawer,
-          hasGuessed: false,
-        })),
-        playersReady: [],
-        currentWord: gameData.current_word,
-        wordChoices: null,
-        currentDrawer: players.find((p) => p.id === gameData.current_drawer),
-        round: gameData.round,
-        maxRounds: gameData.max_rounds,
-        drawTime: 80, // Default draw time for restored games
-        status: gameData.status,
-        gamePhase: "drawing",
-        timeLeft: gameData.status === "playing" ? 80 : 0,
-        drawingData: [],
-        hints: gameData.current_word
-          ? gameData.current_word
-              .split("")
-              .map(() => "_")
-              .join(" ")
-          : "",
-      });
+        this.games.set(gameData.id, {
+          id: gameData.id,
+          roomCode: gameData.room_code,
+          ownerId: gameData.owner_id,
+          players: players.map((p) => ({
+            ...p,
+            isDrawer: p.id === gameData.current_drawer,
+            hasGuessed: false,
+          })),
+          playersReady: [],
+          currentWord: gameData.current_word,
+          wordChoices: null,
+          currentDrawer: players.find((p) => p.id === gameData.current_drawer),
+          round: gameData.round,
+          maxRounds: gameData.max_rounds,
+          drawTime: 80, // Default draw time for restored games
+          status: gameData.status,
+          gamePhase: "drawing",
+          timeLeft: gameData.status === "playing" ? 80 : 0,
+          drawingData: [],
+          hints: gameData.current_word
+            ? gameData.current_word
+                .split("")
+                .map(() => "_")
+                .join(" ")
+            : "",
+        });
+      }
+
+      return this.games.get(gameData.id);
+    } catch (error) {
+      console.error("Error getting game by room code:", error);
+      return null; // Return null instead of throwing to prevent server crash
     }
-
-    return this.games.get(gameData.id);
   }
 
   removePlayer(gameId, userId) {
@@ -509,43 +561,48 @@ class GameManager {
   }
 
   async restartGame(gameId, settings = {}) {
-    const db = getDatabase();
-    const game = this.games.get(gameId);
-    if (!game) return null;
+    try {
+      const db = getDatabase();
+      const game = this.games.get(gameId);
+      if (!game) return null;
 
-    const { drawTime = 80, maxRounds = 3 } = settings;
+      const { drawTime = 80, maxRounds = 3 } = settings;
 
-    // Clear any existing timers first
-    this.clearGameTimers(gameId);
+      // Clear any existing timers first
+      this.clearGameTimers(gameId);
 
-    // Reset game state but keep players and room
-    game.currentWord = null;
-    game.wordChoices = null;
-    game.currentDrawer = null;
-    game.round = 1;
-    game.maxRounds = maxRounds;
-    game.drawTime = drawTime;
-    game.status = "waiting";
-    game.gamePhase = "drawing";
-    game.timeLeft = 0;
-    game.drawingData = [];
-    game.hints = "";
-    game.playersReady = [game.ownerId]; // Owner is automatically ready
+      // Reset game state but keep players and room
+      game.currentWord = null;
+      game.wordChoices = null;
+      game.currentDrawer = null;
+      game.round = 1;
+      game.maxRounds = maxRounds;
+      game.drawTime = drawTime;
+      game.status = "waiting";
+      game.gamePhase = "drawing";
+      game.timeLeft = 0;
+      game.drawingData = [];
+      game.hints = "";
+      game.playersReady = [game.ownerId]; // Owner is automatically ready
 
-    // Reset all player scores and guess status
-    game.players.forEach((player) => {
-      player.score = 0;
-      player.hasGuessed = false;
-      player.isDrawer = false;
-    });
+      // Reset all player scores and guess status
+      game.players.forEach((player) => {
+        player.score = 0;
+        player.hasGuessed = false;
+        player.isDrawer = false;
+      });
 
-    // Update database
-    await db.sql`UPDATE games SET status = ${game.status}, current_word = NULL, current_drawer = NULL, round = ${game.round}, max_rounds = ${game.maxRounds} WHERE id = ${gameId}`;
+      // Update database
+      await db.sql`UPDATE games SET status = ${game.status}, current_word = NULL, current_drawer = NULL, round = ${game.round}, max_rounds = ${game.maxRounds} WHERE id = ${gameId}`;
 
-    // Reset player scores in database
-    await db.sql`UPDATE game_players SET score = 0 WHERE game_id = ${gameId}`;
+      // Reset player scores in database
+      await db.sql`UPDATE game_players SET score = 0 WHERE game_id = ${gameId}`;
 
-    return game;
+      return game;
+    } catch (error) {
+      console.error("Error restarting game:", error);
+      throw new Error("Failed to restart game. Database connection issue.");
+    }
   }
 
   togglePlayerReady(gameId, userId) {

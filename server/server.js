@@ -3,7 +3,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import { v4 as uuidv4 } from "uuid";
-import { initDatabase } from "./database.js";
+import { initDatabase, checkDatabaseHealth } from "./database.js";
 import GameManager from "./gameManager.js";
 
 const app = express();
@@ -28,10 +28,13 @@ app.use(cors());
 app.use(express.json());
 
 // Health check endpoint for Render
-app.get("/health", (req, res) => {
-  res.status(200).json({
-    status: "OK",
+app.get("/health", async (req, res) => {
+  const dbHealthy = await checkDatabaseHealth();
+
+  res.status(dbHealthy ? 200 : 503).json({
+    status: dbHealthy ? "OK" : "UNHEALTHY",
     message: "Skribbl server is running",
+    database: dbHealthy ? "Connected" : "Disconnected",
     timestamp: new Date().toISOString(),
   });
 });
@@ -50,8 +53,37 @@ app.get("/", (req, res) => {
 
 const gameManager = new GameManager();
 
-// Initialize database
-await initDatabase();
+// Initialize database with retry logic
+async function initializeServer() {
+  let retries = 0;
+  const maxRetries = 5;
+
+  while (retries < maxRetries) {
+    try {
+      await initDatabase();
+      console.log("✅ Server initialized successfully!");
+      break;
+    } catch (error) {
+      retries++;
+      console.error(
+        `❌ Server initialization attempt ${retries} failed:`,
+        error.message
+      );
+
+      if (retries < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, retries), 10000); // Exponential backoff, max 10s
+        console.log(`🔄 Retrying in ${delay}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      } else {
+        console.error("❌ Failed to initialize server after maximum retries");
+        process.exit(1);
+      }
+    }
+  }
+}
+
+// Initialize server
+initializeServer();
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
@@ -93,7 +125,9 @@ io.on("connection", (socket) => {
       io.to(game.id).emit("game-update", game);
     } catch (error) {
       console.error("Error joining game:", error);
-      socket.emit("error", { message: "Failed to join game" });
+      socket.emit("error", {
+        message: "Failed to join game. Please try again in a moment.",
+      });
     }
   });
 
@@ -118,6 +152,9 @@ io.on("connection", (socket) => {
       }
     } catch (error) {
       console.error("Error starting game:", error);
+      socket.emit("error", {
+        message: "Failed to start game. Please try again.",
+      });
     }
   });
 
@@ -131,6 +168,9 @@ io.on("connection", (socket) => {
       }
     } catch (error) {
       console.error("Error selecting word:", error);
+      socket.emit("error", {
+        message: "Failed to select word. Please try again.",
+      });
     }
   });
 
@@ -161,94 +201,103 @@ io.on("connection", (socket) => {
     if (game) {
       const user = game.players.find((p) => p.id === socket.id);
       if (user) {
-        const isCorrect = await gameManager.checkGuess(
-          gameId,
-          socket.id,
-          message
-        );
+        try {
+          const isCorrect = await gameManager.checkGuess(
+            gameId,
+            socket.id,
+            message
+          );
 
-        if (isCorrect && user.id !== game.currentDrawer.id) {
-          // Send correct guess notification only to drawer and players who have guessed correctly
-          const correctGuessMessage = {
-            userId: socket.id,
-            userName: user.name,
-            word: game.currentWord,
-          };
+          if (isCorrect && user.id !== game.currentDrawer.id) {
+            // Send correct guess notification only to drawer and players who have guessed correctly
+            const correctGuessMessage = {
+              userId: socket.id,
+              userName: user.name,
+              word: game.currentWord,
+            };
 
-          // Send to drawer and players who have guessed correctly
-          game.players.forEach((player) => {
-            if (player.hasGuessed || player.id === game.currentDrawer?.id) {
-              io.to(player.id).emit("correct-guess", correctGuessMessage);
-            }
-          });
-
-          // Check if all non-drawer players have guessed correctly
-          if (gameManager.allPlayersGuessed(game)) {
-            // All players guessed correctly, move to next turn after delay
-            setTimeout(async () => {
-              gameManager.resetGuessStatus(game);
-              await gameManager.nextTurn(gameId, io);
-              const updatedGame = gameManager.getGame(gameId);
-              if (updatedGame) {
-                io.to(gameId).emit("next-turn", updatedGame);
-                io.to(gameId).emit("game-update", updatedGame);
+            // Send to drawer and players who have guessed correctly
+            game.players.forEach((player) => {
+              if (player.hasGuessed || player.id === game.currentDrawer?.id) {
+                io.to(player.id).emit("correct-guess", correctGuessMessage);
               }
-            }, 3000);
+            });
+
+            // Check if all non-drawer players have guessed correctly
+            if (gameManager.allPlayersGuessed(game)) {
+              // All players guessed correctly, move to next turn after delay
+              setTimeout(async () => {
+                try {
+                  gameManager.resetGuessStatus(game);
+                  await gameManager.nextTurn(gameId, io);
+                  const updatedGame = gameManager.getGame(gameId);
+                  if (updatedGame) {
+                    io.to(gameId).emit("next-turn", updatedGame);
+                    io.to(gameId).emit("game-update", updatedGame);
+                  }
+                } catch (error) {
+                  console.error("Error in next turn after all guessed:", error);
+                }
+              }, 3000);
+            }
+          } else if (!isCorrect && user.id !== game.currentDrawer?.id) {
+            // Send chat message to players who haven't guessed correctly
+            await gameManager.saveMessage(gameId, socket.id, message);
+
+            const chatMessage = {
+              userId: socket.id,
+              userName: user.name,
+              message,
+              timestamp: new Date().toISOString(),
+            };
+
+            // Send to players who haven't guessed correctly
+            game.players.forEach((player) => {
+              if (!player.hasGuessed && player.id !== game.currentDrawer?.id) {
+                io.to(player.id).emit("chat-message", chatMessage);
+              }
+            });
+          } else if (user.id === game.currentDrawer?.id) {
+            // Drawer's message - only visible to players who have guessed correctly
+            await gameManager.saveMessage(gameId, socket.id, message);
+
+            const chatMessage = {
+              userId: socket.id,
+              userName: user.name,
+              message,
+              timestamp: new Date().toISOString(),
+            };
+
+            // Send to players who have guessed correctly
+            game.players.forEach((player) => {
+              if (player.hasGuessed || player.id === game.currentDrawer?.id) {
+                io.to(player.id).emit("chat-message", chatMessage);
+              }
+            });
+          } else if (user.hasGuessed) {
+            // Player who has guessed correctly - visible to drawer and other correct guessers
+            await gameManager.saveMessage(gameId, socket.id, message);
+
+            const chatMessage = {
+              userId: socket.id,
+              userName: user.name,
+              message,
+              timestamp: new Date().toISOString(),
+            };
+
+            // Send to drawer and players who have guessed correctly
+            game.players.forEach((player) => {
+              if (player.hasGuessed || player.id === game.currentDrawer?.id) {
+                io.to(player.id).emit("chat-message", chatMessage);
+              }
+            });
           }
-        } else if (!isCorrect && user.id !== game.currentDrawer?.id) {
-          // Send chat message to players who haven't guessed correctly
-          await gameManager.saveMessage(gameId, socket.id, message);
 
-          const chatMessage = {
-            userId: socket.id,
-            userName: user.name,
-            message,
-            timestamp: new Date().toISOString(),
-          };
-
-          // Send to players who haven't guessed correctly
-          game.players.forEach((player) => {
-            if (!player.hasGuessed && player.id !== game.currentDrawer?.id) {
-              io.to(player.id).emit("chat-message", chatMessage);
-            }
-          });
-        } else if (user.id === game.currentDrawer?.id) {
-          // Drawer's message - only visible to players who have guessed correctly
-          await gameManager.saveMessage(gameId, socket.id, message);
-
-          const chatMessage = {
-            userId: socket.id,
-            userName: user.name,
-            message,
-            timestamp: new Date().toISOString(),
-          };
-
-          // Send to players who have guessed correctly
-          game.players.forEach((player) => {
-            if (player.hasGuessed || player.id === game.currentDrawer?.id) {
-              io.to(player.id).emit("chat-message", chatMessage);
-            }
-          });
-        } else if (user.hasGuessed) {
-          // Player who has guessed correctly - visible to drawer and other correct guessers
-          await gameManager.saveMessage(gameId, socket.id, message);
-
-          const chatMessage = {
-            userId: socket.id,
-            userName: user.name,
-            message,
-            timestamp: new Date().toISOString(),
-          };
-
-          // Send to drawer and players who have guessed correctly
-          game.players.forEach((player) => {
-            if (player.hasGuessed || player.id === game.currentDrawer?.id) {
-              io.to(player.id).emit("chat-message", chatMessage);
-            }
-          });
+          io.to(gameId).emit("game-update", game);
+        } catch (error) {
+          console.error("Error processing chat message:", error);
+          // Don't emit error to prevent chat from breaking
         }
-
-        io.to(gameId).emit("game-update", game);
       }
     }
   });
@@ -300,6 +349,9 @@ io.on("connection", (socket) => {
       }
     } catch (error) {
       console.error("Error restarting game:", error);
+      socket.emit("error", {
+        message: "Failed to restart game. Please try again.",
+      });
     }
   });
 
