@@ -7,10 +7,22 @@ import GameBoard from "./components/GameBoard";
 import GameFinished from "./components/GameFinished";
 
 // Get server URL from environment variable or default to production
+// const getServerUrl = () => {
+//   // In development, use local server
+//   if (import.meta.env.DEV) {
+//     return import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
+//   }
+//   // In production, use deployed server
+//   return "https://skribbl-production.onrender.com";
+// };
+
 const getServerUrl = () => {
   // In development, use local server
   if (import.meta.env.DEV) {
-    return import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
+    return (
+      import.meta.env.VITE_SERVER_URL ||
+      "https://skribbl-production.onrender.com"
+    );
   }
   // In production, use deployed server
   return "https://skribbl-production.onrender.com";
