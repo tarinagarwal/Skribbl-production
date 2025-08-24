@@ -14,7 +14,7 @@ const getServerUrl = () => {
     return import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
   }
   // In production, use deployed server
-  return " https://skribbl-production-y971.onrender.com";
+  return "https://skribbl-production-y971.onrender.com";
 };
 
 // const getServerUrl = () => {
