@@ -13,7 +13,8 @@ const io = new Server(server, {
     origin: [
       "http://localhost:5173", // For local development
       "https://localhost:5173", // For local HTTPS
-      "https://skribbl-production.onrender.com", // Your deployed backend
+      "https://skribbl-production.onrender.com",
+      "https://skribbl-production-y971.onrender.com", // Your deployed backend
       /\.vercel\.app$/, // For Vercel deployments
       /\.netlify\.app$/, // For Netlify deployments
       /\.stackblitz\.io$/, // For StackBlitz
