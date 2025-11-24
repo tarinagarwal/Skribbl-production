@@ -4,6 +4,15 @@ import { Server } from "socket.io";
 import cors from "cors";
 import { initDatabase, checkDatabaseHealth } from "./database.js";
 import GameManager from "./gameManager.js";
+import RateLimiter from "./utils/rateLimiter.js";
+import logger from "./utils/logger.js";
+import {
+  sanitizePlayerName,
+  sanitizeChatMessage,
+  validateRoomCode,
+  validateDrawingData,
+  validateGameSettings,
+} from "./utils/validation.js";
 
 const app = express();
 const server = createServer(app);
@@ -52,6 +61,12 @@ app.get("/", (_req, res) => {
 });
 
 const gameManager = new GameManager();
+const rateLimiter = new RateLimiter();
+
+// Clean up rate limiter every minute
+setInterval(() => {
+  rateLimiter.cleanup();
+}, 60000);
 
 // Initialize database with retry logic
 async function initializeServer() {
@@ -86,35 +101,64 @@ async function initializeServer() {
 initializeServer();
 
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
+  logger.info("User connected", { socketId: socket.id });
 
   socket.on("join-game", async (data) => {
+    // Rate limiting
+    if (!rateLimiter.checkLimit(socket.id, "join-game", 5, 10000)) {
+      socket.emit("error", { message: "Too many requests. Please slow down." });
+      return;
+    }
+
     const { roomCode, playerName, settings } = data;
 
-    console.log(
-      `Player ${playerName} attempting to join/create room ${roomCode}`
-    );
+    // Validate and sanitize inputs
+    const sanitizedName = sanitizePlayerName(playerName);
+    const sanitizedRoomCode = roomCode?.toUpperCase().trim();
+
+    if (!sanitizedName) {
+      socket.emit("error", { message: "Invalid player name." });
+      return;
+    }
+
+    if (!validateRoomCode(sanitizedRoomCode)) {
+      socket.emit("error", { message: "Invalid room code format." });
+      return;
+    }
+
+    const validatedSettings = validateGameSettings(settings);
+
+    logger.info("Player attempting to join/create room", {
+      playerName: sanitizedName,
+      roomCode: sanitizedRoomCode,
+      socketId: socket.id,
+    });
 
     try {
-      let game = await gameManager.getGameByRoomCode(roomCode);
+      let game = await gameManager.getGameByRoomCode(sanitizedRoomCode);
 
       if (!game) {
-        console.log(`Creating new game with room code: ${roomCode}`);
-        const gameId = await gameManager.createGame(roomCode, settings);
+        logger.info("Creating new game", { roomCode: sanitizedRoomCode });
+        const gameId = await gameManager.createGame(
+          sanitizedRoomCode,
+          validatedSettings
+        );
         game = gameManager.getGame(gameId);
-        console.log("New game created:", game);
       }
 
       const user = {
         id: socket.id,
-        name: playerName,
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${playerName}`,
+        name: sanitizedName,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${sanitizedName}`,
       };
 
       await gameManager.joinGame(game.id, user);
       socket.join(game.id);
 
-      console.log(`Player ${playerName} joined game ${game.id}`);
+      logger.info("Player joined game", {
+        playerName: sanitizedName,
+        gameId: game.id,
+      });
 
       socket.emit("game-joined", {
         gameId: game.id,
@@ -124,7 +168,10 @@ io.on("connection", (socket) => {
 
       io.to(game.id).emit("game-update", game);
     } catch (error) {
-      console.error("Error joining game:", error);
+      logger.error("Error joining game", {
+        error: error.message,
+        socketId: socket.id,
+      });
       socket.emit("error", {
         message: "Failed to join game. Please try again in a moment.",
       });
@@ -175,6 +222,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("drawing", (data) => {
+    // Rate limiting for drawing events
+    if (!rateLimiter.checkLimit(socket.id, "drawing", 100, 1000)) {
+      return; // Silently drop excessive drawing events
+    }
+
     const { gameId, drawingData } = data;
     const game = gameManager.getGame(gameId);
 
@@ -184,6 +236,12 @@ io.on("connection", (socket) => {
       game.currentDrawer.id === socket.id &&
       game.status === "playing"
     ) {
+      // Validate drawing data
+      if (!validateDrawingData(drawingData)) {
+        logger.warn("Invalid drawing data received", { socketId: socket.id });
+        return;
+      }
+
       // Limit drawing data to prevent memory issues
       if (game.drawingData.length > 5000) {
         game.drawingData = game.drawingData.slice(-4000);
@@ -191,7 +249,6 @@ io.on("connection", (socket) => {
       game.drawingData.push(drawingData);
       // Broadcast to all players in the room (including drawer for confirmation)
       io.to(gameId).emit("drawing", drawingData);
-      console.log(`Drawing data broadcasted to room ${gameId}`);
     }
   });
 
@@ -213,23 +270,30 @@ io.on("connection", (socket) => {
   });
 
   socket.on("chat-message", async (data) => {
+    // Rate limiting for chat messages
+    if (!rateLimiter.checkLimit(socket.id, "chat-message", 10, 5000)) {
+      socket.emit("error", { message: "Sending messages too fast!" });
+      return;
+    }
+
     const { gameId, message } = data;
     const game = gameManager.getGame(gameId);
 
     if (game) {
       const user = game.players.find((p) => p.id === socket.id);
       if (user) {
+        // Sanitize message
+        const sanitizedMessage = sanitizeChatMessage(message);
+
+        if (!sanitizedMessage) {
+          return;
+        }
+
         try {
           const isCorrect = await gameManager.checkGuess(
             gameId,
             socket.id,
-            message
-          );
-
-          // Filter the message to hide the current word
-          const filteredMessage = gameManager.filterChatMessage(
-            message,
-            game.currentWord
+            sanitizedMessage
           );
 
           if (isCorrect && user.id !== game.currentDrawer.id) {
@@ -265,23 +329,26 @@ io.on("connection", (socket) => {
               }, 3000);
             }
           } else {
-            // Send filtered chat message to all players
-            await gameManager.saveMessage(gameId, socket.id, message);
+            // Send chat message to all players
+            await gameManager.saveMessage(gameId, socket.id, sanitizedMessage);
 
             const chatMessage = {
               userId: socket.id,
               userName: user.name,
-              message: filteredMessage, // Use filtered message
+              message: sanitizedMessage,
               timestamp: new Date().toISOString(),
             };
 
-            // Send filtered message to all players
+            // Send message to all players
             io.to(gameId).emit("chat-message", chatMessage);
           }
 
           io.to(gameId).emit("game-update", game);
         } catch (error) {
-          console.error("Error processing chat message:", error);
+          logger.error("Error processing chat message", {
+            error: error.message,
+            socketId: socket.id,
+          });
           // Don't emit error to prevent chat from breaking
         }
       }
@@ -289,7 +356,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+    logger.info("User disconnected", { socketId: socket.id });
+    rateLimiter.reset(socket.id);
 
     // Remove player from all games
     for (const [gameId, game] of gameManager.games) {
