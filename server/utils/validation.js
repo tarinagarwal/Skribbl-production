@@ -43,36 +43,6 @@ export function validateDrawingData(data) {
     return false;
   }
 
-  // Check if it's Fabric.js format
-  if (data.fabricObject || data.action) {
-    // Validate action
-    const validActions = ["add", "modify", "remove", "clear"];
-    if (data.action && !validActions.includes(data.action)) {
-      return false;
-    }
-
-    // If it's a clear action, no need to validate fabricObject
-    if (data.action === "clear") {
-      return true;
-    }
-
-    // Validate fabricObject exists for add/modify actions
-    if (
-      (data.action === "add" || data.action === "modify") &&
-      !data.fabricObject
-    ) {
-      return false;
-    }
-
-    // Basic validation of fabricObject (it should be an object)
-    if (data.fabricObject && typeof data.fabricObject !== "object") {
-      return false;
-    }
-
-    return true;
-  }
-
-  // Legacy format validation (for backward compatibility)
   const { x, y, prevX, prevY, color, lineWidth, type } = data;
 
   // Validate coordinates are within reasonable bounds
