@@ -246,24 +246,13 @@ io.on("connection", (socket) => {
     });
 
     try {
-      let game = await gameManager.getGameByRoomCode(sanitizedRoomCode);
+      const { game, user } = await gameService.createOrJoinGame(
+        sanitizedRoomCode,
+        sanitizedName,
+        validatedSettings,
+        socket.id
+      );
 
-      if (!game) {
-        logger.info("Creating new game", { roomCode: sanitizedRoomCode });
-        const gameId = await gameManager.createGame(
-          sanitizedRoomCode,
-          validatedSettings
-        );
-        game = gameManager.getGame(gameId);
-      }
-
-      const user = {
-        id: socket.id,
-        name: sanitizedName,
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${sanitizedName}`,
-      };
-
-      await gameManager.joinGame(game.id, user);
       socket.join(game.id);
 
       logger.info("Player joined game", {
@@ -293,25 +282,15 @@ io.on("connection", (socket) => {
     const { gameId } = data;
 
     try {
-      const game = gameManager.getGame(gameId);
-
-      // Check if the player is the room owner
-      if (!game || game.ownerId !== socket.id) {
-        socket.emit("error", {
-          message: "Only the room owner can start the game",
-        });
-        return;
-      }
-
-      const startedGame = await gameManager.startGame(gameId, io);
+      const startedGame = await gameService.startGame(gameId, socket.id, io);
       if (startedGame) {
         io.to(gameId).emit("game-started", startedGame);
         io.to(gameId).emit("game-update", startedGame);
       }
     } catch (error) {
-      console.error("Error starting game:", error);
+      logger.error("Error starting game", { error: error.message });
       socket.emit("error", {
-        message: "Failed to start game. Please try again.",
+        message: error.message || "Failed to start game. Please try again.",
       });
     }
   });
@@ -320,12 +299,12 @@ io.on("connection", (socket) => {
     const { gameId, word } = data;
 
     try {
-      const game = await gameManager.selectWord(gameId, word, io);
+      const game = await gameService.selectWord(gameId, word, io);
       if (game) {
         io.to(gameId).emit("game-update", game);
       }
     } catch (error) {
-      console.error("Error selecting word:", error);
+      logger.error("Error selecting word", { error: error.message });
       socket.emit("error", {
         message: "Failed to select word. Please try again.",
       });
@@ -339,7 +318,7 @@ io.on("connection", (socket) => {
     }
 
     const { gameId, drawingData } = data;
-    const game = gameManager.getGame(gameId);
+    const game = gameService.getGame(gameId);
 
     if (
       game &&
@@ -365,7 +344,7 @@ io.on("connection", (socket) => {
 
   socket.on("clear-canvas", (data) => {
     const { gameId } = data;
-    const game = gameManager.getGame(gameId);
+    const game = gameService.getGame(gameId);
 
     if (
       game &&
@@ -388,81 +367,76 @@ io.on("connection", (socket) => {
     }
 
     const { gameId, message } = data;
-    const game = gameManager.getGame(gameId);
 
-    if (game) {
-      const user = game.players.find((p) => p.id === socket.id);
-      if (user) {
-        // Sanitize message
-        const sanitizedMessage = sanitizeChatMessage(message);
+    try {
+      const result = await gameService.processChatMessage(
+        gameId,
+        message,
+        socket.id
+      );
 
-        if (!sanitizedMessage) {
-          return;
-        }
-
-        try {
-          const isCorrect = await gameManager.checkGuess(
-            gameId,
-            socket.id,
-            sanitizedMessage
-          );
-
-          if (isCorrect && user.id !== game.currentDrawer.id) {
-            // Send correct guess notification only to drawer and players who have guessed correctly
-            const correctGuessMessage = {
-              userId: socket.id,
-              userName: user.name,
-              word: game.currentWord,
-            };
-
-            // Send to drawer and players who have guessed correctly
-            game.players.forEach((player) => {
-              if (player.hasGuessed || player.id === game.currentDrawer?.id) {
-                io.to(player.id).emit("correct-guess", correctGuessMessage);
-              }
-            });
-
-            // Check if all non-drawer players have guessed correctly
-            if (gameManager.allPlayersGuessed(game)) {
-              // All players guessed correctly, move to next turn after delay
-              setTimeout(async () => {
-                try {
-                  gameManager.resetGuessStatus(game);
-                  await gameManager.nextTurn(gameId, io);
-                  const updatedGame = gameManager.getGame(gameId);
-                  if (updatedGame) {
-                    io.to(gameId).emit("next-turn", updatedGame);
-                    io.to(gameId).emit("game-update", updatedGame);
-                  }
-                } catch (error) {
-                  console.error("Error in next turn after all guessed:", error);
-                }
-              }, 3000);
-            }
-          } else {
-            // Send chat message to all players
-            await gameManager.saveMessage(gameId, socket.id, sanitizedMessage);
-
-            const chatMessage = {
-              userId: socket.id,
-              userName: user.name,
-              message: sanitizedMessage,
-              timestamp: new Date().toISOString(),
-            };
-
-            // Send message to all players
-            io.to(gameId).emit("chat-message", chatMessage);
-          }
-
-          io.to(gameId).emit("game-update", game);
-        } catch (error) {
-          logger.error("Error processing chat message", {
-            error: error.message,
-            socketId: socket.id,
-          });
-          // Don't emit error to prevent chat from breaking
-        }
+      if (!result) {
+        return;
       }
+
+      const { game, user, isCorrect } = result;
+
+      if (isCorrect && user.id !== game.currentDrawer.id) {
+        // Send correct guess notification only to drawer and players who have guessed correctly
+        const correctGuessMessage = {
+          userId: socket.id,
+          userName: user.name,
+          word: game.currentWord,
+        };
+
+        // Send to drawer and players who have guessed correctly
+        game.players.forEach((player) => {
+          if (player.hasGuessed || player.id === game.currentDrawer?.id) {
+            io.to(player.id).emit("correct-guess", correctGuessMessage);
+          }
+        });
+
+        // Check if all non-drawer players have guessed correctly
+        if (gameService.gameManager.allPlayersGuessed(game)) {
+          // All players guessed correctly, move to next turn after delay
+          setTimeout(async () => {
+            try {
+              gameService.gameManager.resetGuessStatus(game);
+              await gameService.gameManager.nextTurn(gameId, io);
+              const updatedGame = gameService.getGame(gameId);
+              if (updatedGame) {
+                io.to(gameId).emit("next-turn", updatedGame);
+                io.to(gameId).emit("game-update", updatedGame);
+              }
+            } catch (error) {
+              logger.error("Error in next turn after all guessed", {
+                error: error.message,
+              });
+            }
+          }, 3000);
+        }
+      } else {
+        // Send chat message to all players
+        await gameService.gameManager.saveMessage(gameId, socket.id, message);
+
+        const chatMessage = {
+          userId: socket.id,
+          userName: user.name,
+          message: message,
+          timestamp: new Date().toISOString(),
+        };
+
+        // Send message to all players
+        io.to(gameId).emit("chat-message", chatMessage);
+      }
+
+      io.to(gameId).emit("game-update", game);
+    } catch (error) {
+      logger.error("Error processing chat message", {
+        error: error.message,
+        socketId: socket.id,
+      });
+      // Don't emit error to prevent chat from breaking
     }
   });
 
@@ -471,30 +445,19 @@ io.on("connection", (socket) => {
     rateLimiter.reset(socket.id);
 
     // Remove player from all games
-    for (const [gameId, game] of gameManager.games) {
-      if (game.players.find((p) => p.id === socket.id)) {
-        const updatedGame = gameManager.removePlayer(gameId, socket.id);
+    const disconnectResult = gameService.handlePlayerDisconnect(socket.id);
 
-        // Get player name before removal for the message
-        const leavingPlayer = game.players.find((p) => p.id === socket.id);
-        const playerName = leavingPlayer ? leavingPlayer.name : "A player";
+    if (disconnectResult) {
+      const { gameId, playerName, updatedGame } = disconnectResult;
 
-        io.to(gameId).emit("player-left", {
-          userId: socket.id,
-          playerName,
-          newOwnerId: updatedGame?.ownerId,
-        });
+      io.to(gameId).emit("player-left", {
+        userId: socket.id,
+        playerName,
+        newOwnerId: updatedGame?.ownerId,
+      });
 
-        if (updatedGame) {
-          io.to(gameId).emit("game-update", updatedGame);
-        }
-
-        // Clear any running timers for disconnected players
-        if (updatedGame && updatedGame.players.length === 0) {
-          gameManager.clearGameTimers(gameId);
-        }
-
-        break;
+      if (updatedGame) {
+        io.to(gameId).emit("game-update", updatedGame);
       }
     }
   });
@@ -503,25 +466,19 @@ io.on("connection", (socket) => {
     const { gameId, settings } = data;
 
     try {
-      const game = gameManager.getGame(gameId);
-
-      // Check if the player is the room owner
-      if (!game || game.ownerId !== socket.id) {
-        socket.emit("error", {
-          message: "Only the room owner can restart the game",
-        });
-        return;
-      }
-
-      const restartedGame = await gameManager.restartGame(gameId, settings);
+      const restartedGame = await gameService.restartGame(
+        gameId,
+        socket.id,
+        settings
+      );
       if (restartedGame) {
         io.to(gameId).emit("game-restarted", restartedGame);
         io.to(gameId).emit("game-update", restartedGame);
       }
     } catch (error) {
-      console.error("Error restarting game:", error);
+      logger.error("Error restarting game", { error: error.message });
       socket.emit("error", {
-        message: "Failed to restart game. Please try again.",
+        message: error.message || "Failed to restart game. Please try again.",
       });
     }
   });
