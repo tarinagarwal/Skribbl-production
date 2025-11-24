@@ -4,6 +4,7 @@ export interface User {
   avatar: string;
   score: number;
   isDrawer: boolean;
+  isSpectator?: boolean;
 }
 
 export interface Game {
@@ -11,6 +12,7 @@ export interface Game {
   roomCode: string;
   ownerId: string | null;
   players: User[];
+  spectators?: User[]; // Array of spectators
   playersReady: string[]; // Array of player IDs who are ready for next game
   bannedPlayers?: string[]; // Array of banned player IDs
   currentWord: string | null;
