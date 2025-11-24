@@ -13,6 +13,9 @@ export const useSocket = (serverUrl: string) => {
       transports: ["websocket", "polling"], // Fallback to polling if websocket fails
       timeout: 20000, // 20 second timeout
       forceNew: true, // Force new connection
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
 
     socketRef.current.on("connect", () => {
@@ -24,6 +27,15 @@ export const useSocket = (serverUrl: string) => {
       console.log("Socket disconnected");
       setIsConnected(false);
     });
+
+    socketRef.current.on("reconnect_attempt", (attempt) => {
+      console.log(`Reconnection attempt ${attempt}`);
+    });
+
+    socketRef.current.on("reconnect_failed", () => {
+      console.error("Failed to reconnect after maximum attempts");
+    });
+
     //@ts-ignore
     socketRef.current.on("connect_error", (error) => {
       console.error("Socket connection error:", error);
@@ -37,7 +49,7 @@ export const useSocket = (serverUrl: string) => {
         socketRef.current.disconnect();
       }
     };
-  }, []); // Remove serverUrl dependency to prevent reconnections
+  }, [serverUrl]); // Include serverUrl to handle URL changes
 
   return socketRef.current;
 };

@@ -565,29 +565,38 @@ class GameManager {
     if (!game) return;
 
     const wasOwner = game.ownerId === userId;
+    const wasDrawer = game.currentDrawer?.id === userId;
     game.players = game.players.filter((p) => p.id !== userId);
     game.playersReady = game.playersReady.filter((id) => id !== userId);
 
     if (game.players.length === 0) {
       this.games.delete(gameId);
       this.clearGameTimers(gameId);
-    } else if (wasOwner && game.players.length > 0) {
-      // Transfer ownership to a random remaining player
-      const randomIndex = Math.floor(Math.random() * game.players.length);
-      const newOwnerId = game.players[randomIndex].id;
-      game.ownerId = newOwnerId;
-
-      // New owner is automatically ready if game is finished
-      if (
-        game.status === "finished" &&
-        !game.playersReady.includes(newOwnerId)
-      ) {
-        game.playersReady.push(newOwnerId);
+    } else {
+      // If drawer left during active game, clear timers and handle turn
+      if (wasDrawer && game.status === "playing") {
+        this.clearGameTimers(gameId);
+        console.log(`Drawer left game ${gameId}, clearing timers`);
       }
 
-      console.log(
-        `Ownership transferred to player: ${game.players[randomIndex].name}`
-      );
+      if (wasOwner && game.players.length > 0) {
+        // Transfer ownership to a random remaining player
+        const randomIndex = Math.floor(Math.random() * game.players.length);
+        const newOwnerId = game.players[randomIndex].id;
+        game.ownerId = newOwnerId;
+
+        // New owner is automatically ready if game is finished
+        if (
+          game.status === "finished" &&
+          !game.playersReady.includes(newOwnerId)
+        ) {
+          game.playersReady.push(newOwnerId);
+        }
+
+        console.log(
+          `Ownership transferred to player: ${game.players[randomIndex].name}`
+        );
+      }
     }
 
     return game;
