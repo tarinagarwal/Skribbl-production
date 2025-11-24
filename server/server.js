@@ -3,7 +3,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import { initDatabase, checkDatabaseHealth } from "./database.js";
-import GameManager from "./gameManager.js";
+import GameService from "./services/GameService.js";
 import RateLimiter from "./utils/rateLimiter.js";
 import logger from "./utils/logger.js";
 import {
@@ -60,13 +60,30 @@ app.get("/", (_req, res) => {
   });
 });
 
-const gameManager = new GameManager();
+const gameService = new GameService();
 const rateLimiter = new RateLimiter();
 
 // Clean up rate limiter every minute
 setInterval(() => {
   rateLimiter.cleanup();
 }, 60000);
+
+// Clean up old games every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [gameId, game] of gameService.gameManager.games) {
+    // Remove games that have been finished for more than 1 hour with no players
+    if (
+      game.status === "finished" &&
+      game.players.length === 0 &&
+      now - game.finishedAt > 3600000
+    ) {
+      gameService.gameManager.games.delete(gameId);
+      gameService.gameManager.clearGameTimers(gameId);
+      logger.info("Cleaned up old game", { gameId });
+    }
+  }
+}, 1800000);
 
 // Initialize database with retry logic
 async function initializeServer() {
