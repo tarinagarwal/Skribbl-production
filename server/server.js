@@ -114,6 +114,46 @@ app.post("/api/words/custom", async (req, res) => {
   }
 });
 
+// Server stats and monitoring endpoint
+app.get("/api/stats", (_req, res) => {
+  try {
+    const activeGames = gameService.gameManager.games.size;
+    const totalPlayers = Array.from(
+      gameService.gameManager.games.values()
+    ).reduce((sum, game) => sum + game.players.length, 0);
+
+    const gamesByStatus = {
+      waiting: 0,
+      playing: 0,
+      finished: 0,
+    };
+
+    for (const game of gameService.gameManager.games.values()) {
+      gamesByStatus[game.status]++;
+    }
+
+    res.json({
+      server: {
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        version: "1.0.0",
+      },
+      games: {
+        active: activeGames,
+        byStatus: gamesByStatus,
+      },
+      players: {
+        total: totalPlayers,
+        average: activeGames > 0 ? (totalPlayers / activeGames).toFixed(2) : 0,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Error fetching stats", { error: error.message });
+    res.status(500).json({ error: "Failed to fetch stats" });
+  }
+});
+
 const gameService = new GameService();
 const rateLimiter = new RateLimiter();
 

@@ -76,8 +76,24 @@ export function validateDrawingData(data) {
   }
 
   // Validate type
-  if (type !== "draw" && type !== "erase") {
+  const validTypes = ["draw", "erase", "line", "circle", "rectangle", "fill"];
+  if (!validTypes.includes(type)) {
     return false;
+  }
+
+  // Validate endX and endY for shape tools
+  if (["line", "circle", "rectangle"].includes(type)) {
+    const { endX, endY } = data;
+    if (
+      typeof endX !== "number" ||
+      endX < 0 ||
+      endX > maxCoord ||
+      typeof endY !== "number" ||
+      endY < 0 ||
+      endY > maxCoord
+    ) {
+      return false;
+    }
   }
 
   return true;

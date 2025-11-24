@@ -35,7 +35,9 @@ export interface DrawingData {
   prevY: number;
   color: string;
   lineWidth: number;
-  type: "draw" | "erase";
+  type: "draw" | "erase" | "line" | "circle" | "rectangle" | "fill";
+  endX?: number;
+  endY?: number;
 }
 
 export interface ChatMessage {
