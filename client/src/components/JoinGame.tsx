@@ -15,12 +15,23 @@ const JoinGame: React.FC<JoinGameProps> = ({ onJoinGame, onCreateRoom }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted:", { mode, playerName, roomCode });
+    console.log("Form submitted:", {
+      mode,
+      playerName,
+      roomCode,
+      drawTime,
+      maxRounds,
+    });
 
     if (playerName.trim()) {
       if (mode === "create") {
-        console.log("Creating room for player:", playerName.trim());
-        onCreateRoom(playerName.trim());
+        console.log(
+          "Creating room for player:",
+          playerName.trim(),
+          "with settings:",
+          { drawTime, maxRounds }
+        );
+        onCreateRoom(playerName.trim(), { drawTime, maxRounds });
       } else if (mode === "join" && roomCode.trim()) {
         console.log(
           "Joining room:",

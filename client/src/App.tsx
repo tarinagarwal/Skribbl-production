@@ -6,28 +6,23 @@ import JoinGame from "./components/JoinGame";
 import GameLobby from "./components/GameLobby";
 import GameBoard from "./components/GameBoard";
 import GameFinished from "./components/GameFinished";
+import ConnectionStatus from "./components/ConnectionStatus";
 
 // Get server URL from environment variable or default to production
 const getServerUrl = () => {
+  // Always prefer environment variable if set
+  if (import.meta.env.VITE_SERVER_URL) {
+    return import.meta.env.VITE_SERVER_URL;
+  }
+
   // In development, use local server
   if (import.meta.env.DEV) {
-    return import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
+    return "http://localhost:3001";
   }
+
   // In production, use deployed server
   return "https://skribbl-production-y971.onrender.com";
 };
-
-// const getServerUrl = () => {
-//   // In development, use local server
-//   if (import.meta.env.DEV) {
-//     return (
-//       import.meta.env.VITE_SERVER_URL ||
-//       "https://skribbl-production.onrender.com"
-//     );
-//   }
-//   // In production, use deployed server
-//   return "https://skribbl-production.onrender.com";
-// };
 
 function App() {
   const socket = useSocket(getServerUrl());
@@ -38,6 +33,7 @@ function App() {
     "join" | "lobby" | "playing" | "finished"
   >("join");
   const [socketConnected, setSocketConnected] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [showRoundEnd, setShowRoundEnd] = useState(false);
 
   // Monitor socket connection status
@@ -46,10 +42,18 @@ function App() {
 
     const checkConnection = () => {
       setSocketConnected(socket.connected);
+      if (socket.connected) {
+        setIsReconnecting(false);
+      }
+    };
+
+    const handleReconnecting = () => {
+      setIsReconnecting(true);
     };
 
     socket.on("connect", checkConnection);
     socket.on("disconnect", checkConnection);
+    socket.on("reconnect_attempt", handleReconnecting);
 
     // Initial check
     checkConnection();
@@ -57,6 +61,7 @@ function App() {
     return () => {
       socket.off("connect", checkConnection);
       socket.off("disconnect", checkConnection);
+      socket.off("reconnect_attempt", handleReconnecting);
     };
   }, [socket]);
 
@@ -249,7 +254,11 @@ function App() {
     playerName: string,
     settings?: { drawTime: number; maxRounds: number }
   ) => {
-    console.log("handleCreateRoom called:", { playerName, socketConnected });
+    console.log("handleCreateRoom called:", {
+      playerName,
+      settings,
+      socketConnected,
+    });
     if (socket && socketConnected) {
       // Generate a random room code
       const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -257,7 +266,7 @@ function App() {
       socket.emit("join-game", {
         roomCode,
         playerName,
-        settings: { drawTime: 80, maxRounds: 3 },
+        settings: settings || { drawTime: 80, maxRounds: 3 },
       });
     } else {
       console.error("Socket not connected. Connected:", socketConnected);
@@ -332,45 +341,69 @@ function App() {
 
   if (gameState === "join") {
     return (
-      <JoinGame onJoinGame={handleJoinGame} onCreateRoom={handleCreateRoom} />
+      <>
+        <ConnectionStatus
+          isConnected={socketConnected}
+          isReconnecting={isReconnecting}
+        />
+        <JoinGame onJoinGame={handleJoinGame} onCreateRoom={handleCreateRoom} />
+      </>
     );
   }
 
   if (gameState === "lobby" && game) {
     return (
-      <GameLobby
-        game={game}
-        currentUser={currentUser}
-        onStartGame={handleStartGame}
-      />
+      <>
+        <ConnectionStatus
+          isConnected={socketConnected}
+          isReconnecting={isReconnecting}
+        />
+        <GameLobby
+          game={game}
+          currentUser={currentUser}
+          onStartGame={handleStartGame}
+        />
+      </>
     );
   }
 
   if (gameState === "playing" && game) {
     return (
-      <GameBoard
-        game={game}
-        currentUser={currentUser}
-        onDraw={handleDraw}
-        onClear={handleClearCanvas}
-        onSendMessage={handleSendMessage}
-        messages={messages}
-        onWordSelect={handleWordSelect}
-        showRoundEnd={showRoundEnd}
-        onRoundEndContinue={handleRoundEndContinue}
-      />
+      <>
+        <ConnectionStatus
+          isConnected={socketConnected}
+          isReconnecting={isReconnecting}
+        />
+        <GameBoard
+          game={game}
+          currentUser={currentUser}
+          onDraw={handleDraw}
+          onClear={handleClearCanvas}
+          onSendMessage={handleSendMessage}
+          messages={messages}
+          onWordSelect={handleWordSelect}
+          showRoundEnd={showRoundEnd}
+          onRoundEndContinue={handleRoundEndContinue}
+        />
+      </>
     );
   }
 
   if (gameState === "finished" && game) {
     return (
-      <GameFinished
-        game={game}
-        currentUser={currentUser}
-        onPlayAgain={handlePlayAgain}
-        onRestartGame={handleRestartGame}
-        onToggleReady={handleToggleReady}
-      />
+      <>
+        <ConnectionStatus
+          isConnected={socketConnected}
+          isReconnecting={isReconnecting}
+        />
+        <GameFinished
+          game={game}
+          currentUser={currentUser}
+          onPlayAgain={handlePlayAgain}
+          onRestartGame={handleRestartGame}
+          onToggleReady={handleToggleReady}
+        />
+      </>
     );
   }
 
