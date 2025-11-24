@@ -2,7 +2,6 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
-import { v4 as uuidv4 } from "uuid";
 import { initDatabase, checkDatabaseHealth } from "./database.js";
 import GameManager from "./gameManager.js";
 
@@ -29,7 +28,7 @@ app.use(cors());
 app.use(express.json());
 
 // Health check endpoint for Render
-app.get("/health", async (req, res) => {
+app.get("/health", async (_req, res) => {
   const dbHealthy = await checkDatabaseHealth();
 
   res.status(dbHealthy ? 200 : 503).json({
@@ -41,7 +40,7 @@ app.get("/health", async (req, res) => {
 });
 
 // Basic route for testing
-app.get("/", (req, res) => {
+app.get("/", (_req, res) => {
   res.json({
     message: "Skribbl.io Server",
     status: "Running",
@@ -185,10 +184,14 @@ io.on("connection", (socket) => {
       game.currentDrawer.id === socket.id &&
       game.status === "playing"
     ) {
+      // Limit drawing data to prevent memory issues
+      if (game.drawingData.length > 5000) {
+        game.drawingData = game.drawingData.slice(-4000);
+      }
       game.drawingData.push(drawingData);
-      // Broadcast to all other players in the room
-      socket.to(gameId).emit("drawing", drawingData);
-      console.log(`Drawing data broadcasted to room ${gameId}:`, drawingData);
+      // Broadcast to all players in the room (including drawer for confirmation)
+      io.to(gameId).emit("drawing", drawingData);
+      console.log(`Drawing data broadcasted to room ${gameId}`);
     }
   });
 
