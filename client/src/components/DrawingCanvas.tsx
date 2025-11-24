@@ -37,6 +37,8 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const [color, setColor] = useState("#000000");
   const [lineWidth, setLineWidth] = useState(3);
   const [tool, setTool] = useState<"draw" | "erase">("draw");
+  const [history, setHistory] = useState<DrawingData[][]>([]);
+  const [historyStep, setHistoryStep] = useState(-1);
   const [lastPoint, setLastPoint] = useState<{ x: number; y: number } | null>(
     null
   );

@@ -7,6 +7,7 @@ import GameLobby from "./components/GameLobby";
 import GameBoard from "./components/GameBoard";
 import GameFinished from "./components/GameFinished";
 import ConnectionStatus from "./components/ConnectionStatus";
+import soundManager from "./utils/sounds";
 
 // Get server URL from environment variable or default to production
 const getServerUrl = () => {
@@ -117,6 +118,7 @@ function App() {
 
     //@ts-ignore
     socket.on("correct-guess", (data) => {
+      soundManager.playCorrectGuess();
       setMessages((prev) => [
         ...prev,
         {
@@ -129,10 +131,12 @@ function App() {
     });
     //@ts-ignore
     socket.on("round-end", (data) => {
+      soundManager.playRoundEnd();
       setShowRoundEnd(true);
     });
 
     socket.on("next-turn", (gameData: Game) => {
+      soundManager.playNewTurn();
       setGame(gameData);
       setShowRoundEnd(false); // Hide round end screen when next turn starts
       setMessages((prev) => [

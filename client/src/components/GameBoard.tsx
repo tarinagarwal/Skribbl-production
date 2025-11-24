@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Clock, Trophy, Users, Eye, Pencil } from "lucide-react";
 import { Game, User, DrawingData, ChatMessage } from "../types/game";
 import DrawingCanvas from "./DrawingCanvas";
 import ChatBox from "./ChatBox";
 import WordChoice from "./WordChoice";
 import RoundEndScreen from "./RoundEndScreen";
+import soundManager from "../utils/sounds";
 
 interface GameBoardProps {
   game: Game;
@@ -31,9 +32,22 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(
     onRoundEndContinue,
   }) => {
     const isDrawer = currentUser?.id === game.currentDrawer?.id;
+    const lastTimeRef = useRef(game.timeLeft);
 
     // Use server-provided time directly
     const timeLeft = game.timeLeft;
+
+    // Play warning sound when time is running out
+    useEffect(() => {
+      if (
+        timeLeft === 10 &&
+        lastTimeRef.current > 10 &&
+        game.gamePhase === "drawing"
+      ) {
+        soundManager.playTimerWarning();
+      }
+      lastTimeRef.current = timeLeft;
+    }, [timeLeft, game.gamePhase]);
 
     const getWordDisplay = () => {
       if (isDrawer) {
