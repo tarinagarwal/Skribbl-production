@@ -167,6 +167,19 @@ export async function initDatabase() {
           FOREIGN KEY (user_id) REFERENCES users(id)
         )
       `;
+
+      await db.sql`
+        CREATE TABLE IF NOT EXISTS player_stats (
+          user_id TEXT PRIMARY KEY,
+          games_played INTEGER DEFAULT 0,
+          games_won INTEGER DEFAULT 0,
+          total_score INTEGER DEFAULT 0,
+          correct_guesses INTEGER DEFAULT 0,
+          words_drawn INTEGER DEFAULT 0,
+          last_played DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+      `;
     });
 
     console.log("✅ Database tables created successfully");

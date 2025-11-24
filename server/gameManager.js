@@ -34,6 +34,7 @@ class GameManager {
         timeLeft: 0,
         drawingData: [],
         hints: "",
+        finishedAt: null,
       });
 
       return gameId;
@@ -199,6 +200,7 @@ class GameManager {
         game.round++;
         if (game.round > game.maxRounds) {
           game.status = "finished";
+          game.finishedAt = Date.now();
           // Owner is automatically ready when game finishes
           game.playersReady = [game.ownerId];
           await db.sql`UPDATE games SET status = ${"finished"} WHERE id = ${gameId}`;
