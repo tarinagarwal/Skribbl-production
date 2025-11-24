@@ -8,9 +8,10 @@
     "start": "node server.js",
     "dev": "node server.js",
     "import-words": "node importWords.js",
-    "test": "node tests/validation.test.js && node tests/rateLimiter.test.js",
+    "test": "node tests/validation.test.js && node tests/rateLimiter.test.js && node tests/gameSanitizer.test.js",
     "test:validation": "node tests/validation.test.js",
-    "test:ratelimiter": "node tests/rateLimiter.test.js"
+    "test:ratelimiter": "node tests/rateLimiter.test.js",
+    "test:sanitizer": "node tests/gameSanitizer.test.js"
   },
   "dependencies": {
     "@sqlitecloud/drivers": "^1.0.507",
