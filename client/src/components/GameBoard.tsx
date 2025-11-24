@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Clock, Trophy, Users, Eye, Pencil, Settings } from "lucide-react";
 import { Game, User, DrawingData, ChatMessage } from "../types/game";
-import DrawingCanvas from "./DrawingCanvas";
+import FabricDrawingCanvas from "./FabricDrawingCanvas";
 import ChatBox from "./ChatBox";
 import WordChoice from "./WordChoice";
 import RoundEndScreen from "./RoundEndScreen";
@@ -230,7 +230,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(
 
               {/* Drawing Canvas */}
               <div className="lg:col-span-2 order-1 lg:order-2">
-                <DrawingCanvas
+                <FabricDrawingCanvas
                   isDrawer={isDrawer}
                   onDraw={onDraw}
                   onClear={onClear}

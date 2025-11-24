@@ -371,9 +371,12 @@ io.on("connection", (socket) => {
       game.status === "playing"
     ) {
       game.drawingData = [];
-      // Broadcast clear to all other players in the room
-      socket.to(gameId).emit("clear-canvas");
-      console.log(`Canvas cleared for room ${gameId}`);
+
+      // Broadcast clear action to all players
+      const clearData = { action: "clear" };
+      io.to(gameId).emit("drawing", clearData);
+
+      logger.info("Canvas cleared", { gameId, clearedBy: socket.id });
     }
   });
 
