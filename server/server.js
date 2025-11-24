@@ -13,6 +13,12 @@ import {
   validateDrawingData,
   validateGameSettings,
 } from "./utils/validation.js";
+import {
+  sanitizeGameForPlayer,
+  canPlayerSeeWord,
+  filterChatMessage,
+  getPlayersWhoCanSeeWord,
+} from "./utils/gameSanitizer.js";
 
 const app = express();
 const server = createServer(app);
@@ -157,6 +163,17 @@ app.get("/api/stats", (_req, res) => {
 const gameService = new GameService();
 const rateLimiter = new RateLimiter();
 
+// Helper function to send sanitized game updates to all players
+function broadcastGameUpdate(io, gameId, game) {
+  if (!game) return;
+
+  // Send personalized game state to each player
+  game.players.forEach((player) => {
+    const sanitizedGame = sanitizeGameForPlayer(game, player.id);
+    io.to(player.id).emit("game-update", sanitizedGame);
+  });
+}
+
 // Clean up rate limiter every minute
 setInterval(() => {
   rateLimiter.cleanup();
@@ -266,7 +283,8 @@ io.on("connection", (socket) => {
         user,
       });
 
-      io.to(game.id).emit("game-update", game);
+      // Send sanitized game state to all players
+      broadcastGameUpdate(io, game.id, game);
     } catch (error) {
       logger.error("Error joining game", {
         error: error.message,
@@ -285,7 +303,7 @@ io.on("connection", (socket) => {
       const startedGame = await gameService.startGame(gameId, socket.id, io);
       if (startedGame) {
         io.to(gameId).emit("game-started", startedGame);
-        io.to(gameId).emit("game-update", startedGame);
+        broadcastGameUpdate(io, gameId, startedGame);
       }
     } catch (error) {
       logger.error("Error starting game", { error: error.message });
@@ -301,7 +319,7 @@ io.on("connection", (socket) => {
     try {
       const game = await gameService.selectWord(gameId, word, io);
       if (game) {
-        io.to(gameId).emit("game-update", game);
+        broadcastGameUpdate(io, gameId, game);
       }
     } catch (error) {
       logger.error("Error selecting word", { error: error.message });
@@ -382,18 +400,18 @@ io.on("connection", (socket) => {
       const { game, user, isCorrect } = result;
 
       if (isCorrect && user.id !== game.currentDrawer.id) {
-        // Send correct guess notification only to drawer and players who have guessed correctly
+        // Get list of players who can see the word
+        const authorizedPlayers = getPlayersWhoCanSeeWord(game);
+
+        // Send correct guess notification ONLY to authorized players
         const correctGuessMessage = {
           userId: socket.id,
           userName: user.name,
-          word: game.currentWord,
+          word: game.currentWord, // Only sent to authorized players
         };
 
-        // Send to drawer and players who have guessed correctly
-        game.players.forEach((player) => {
-          if (player.hasGuessed || player.id === game.currentDrawer?.id) {
-            io.to(player.id).emit("correct-guess", correctGuessMessage);
-          }
+        authorizedPlayers.forEach((playerId) => {
+          io.to(playerId).emit("correct-guess", correctGuessMessage);
         });
 
         // Check if all non-drawer players have guessed correctly
@@ -406,7 +424,7 @@ io.on("connection", (socket) => {
               const updatedGame = gameService.getGame(gameId);
               if (updatedGame) {
                 io.to(gameId).emit("next-turn", updatedGame);
-                io.to(gameId).emit("game-update", updatedGame);
+                broadcastGameUpdate(io, gameId, updatedGame);
               }
             } catch (error) {
               logger.error("Error in next turn after all guessed", {
@@ -416,21 +434,28 @@ io.on("connection", (socket) => {
           }, 3000);
         }
       } else {
-        // Send chat message to all players
+        // Filter message for players who haven't guessed
         await gameService.gameManager.saveMessage(gameId, socket.id, message);
 
-        const chatMessage = {
-          userId: socket.id,
-          userName: user.name,
-          message: message,
-          timestamp: new Date().toISOString(),
-        };
+        // Send different versions of the message based on player status
+        game.players.forEach((player) => {
+          const shouldSeeWord = canPlayerSeeWord(game, player.id);
+          const displayMessage = shouldSeeWord
+            ? message
+            : filterChatMessage(message, game.currentWord);
 
-        // Send message to all players
-        io.to(gameId).emit("chat-message", chatMessage);
+          const chatMessage = {
+            userId: socket.id,
+            userName: user.name,
+            message: displayMessage,
+            timestamp: new Date().toISOString(),
+          };
+
+          io.to(player.id).emit("chat-message", chatMessage);
+        });
       }
 
-      io.to(gameId).emit("game-update", game);
+      broadcastGameUpdate(io, gameId, game);
     } catch (error) {
       logger.error("Error processing chat message", {
         error: error.message,
@@ -457,7 +482,7 @@ io.on("connection", (socket) => {
       });
 
       if (updatedGame) {
-        io.to(gameId).emit("game-update", updatedGame);
+        broadcastGameUpdate(io, gameId, updatedGame);
       }
     }
   });
@@ -473,7 +498,7 @@ io.on("connection", (socket) => {
       );
       if (restartedGame) {
         io.to(gameId).emit("game-restarted", restartedGame);
-        io.to(gameId).emit("game-update", restartedGame);
+        broadcastGameUpdate(io, gameId, restartedGame);
       }
     } catch (error) {
       logger.error("Error restarting game", { error: error.message });
@@ -489,7 +514,7 @@ io.on("connection", (socket) => {
     try {
       const game = gameService.togglePlayerReady(gameId, socket.id);
       if (game) {
-        io.to(gameId).emit("game-update", game);
+        broadcastGameUpdate(io, gameId, game);
       }
     } catch (error) {
       logger.error("Error toggling ready status", { error: error.message });
@@ -517,7 +542,7 @@ io.on("connection", (socket) => {
           playerId: targetPlayerId,
         });
 
-        io.to(gameId).emit("game-update", updatedGame);
+        broadcastGameUpdate(io, gameId, updatedGame);
 
         logger.info("Player kicked", {
           gameId,
