@@ -134,6 +134,34 @@ class GameService {
     return this.gameManager.togglePlayerReady(gameId, socketId);
   }
 
+  kickPlayer(gameId, ownerId, targetPlayerId) {
+    const game = this.gameManager.getGame(gameId);
+
+    if (!game || game.ownerId !== ownerId) {
+      throw new Error("Only the room owner can kick players");
+    }
+
+    if (targetPlayerId === ownerId) {
+      throw new Error("Cannot kick yourself");
+    }
+
+    // Add to banned list
+    if (!game.bannedPlayers) {
+      game.bannedPlayers = [];
+    }
+    game.bannedPlayers.push(targetPlayerId);
+
+    // Remove player
+    const updatedGame = this.gameManager.removePlayer(gameId, targetPlayerId);
+    return updatedGame;
+  }
+
+  isPlayerBanned(gameId, playerId) {
+    const game = this.gameManager.getGame(gameId);
+    if (!game) return false;
+    return game.bannedPlayers?.includes(playerId) || false;
+  }
+
   getGame(gameId) {
     return this.gameManager.getGame(gameId);
   }

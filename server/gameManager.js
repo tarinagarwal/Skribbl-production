@@ -23,6 +23,7 @@ class GameManager {
         ownerId: null, // Will be set when first player joins
         players: [],
         playersReady: [],
+        bannedPlayers: [],
         currentWord: null,
         wordChoices: null,
         currentDrawer: null,

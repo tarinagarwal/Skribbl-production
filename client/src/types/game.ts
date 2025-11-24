@@ -12,6 +12,7 @@ export interface Game {
   ownerId: string | null;
   players: User[];
   playersReady: string[]; // Array of player IDs who are ready for next game
+  bannedPlayers?: string[]; // Array of banned player IDs
   currentWord: string | null;
   wordChoices: string[] | null;
   currentDrawer: User | null;

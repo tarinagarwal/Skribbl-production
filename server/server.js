@@ -55,9 +55,63 @@ app.get("/", (_req, res) => {
     status: "Running",
     endpoints: {
       health: "/health",
+      leaderboard: "/api/leaderboard",
       socket: "Socket.IO connection available",
     },
   });
+});
+
+// Leaderboard API endpoint
+app.get("/api/leaderboard", async (_req, res) => {
+  try {
+    const StatsService = (await import("./services/StatsService.js")).default;
+    const statsService = new StatsService();
+    const leaderboard = await statsService.getLeaderboard(10);
+    res.json(leaderboard);
+  } catch (error) {
+    logger.error("Error fetching leaderboard", { error: error.message });
+    res.status(500).json({ error: "Failed to fetch leaderboard" });
+  }
+});
+
+// Word count API endpoint
+app.get("/api/words/count", async (_req, res) => {
+  try {
+    const WordService = (await import("./services/WordService.js")).default;
+    const wordService = new WordService();
+    const count = await wordService.getWordCount();
+    res.json(count);
+  } catch (error) {
+    logger.error("Error fetching word count", { error: error.message });
+    res.status(500).json({ error: "Failed to fetch word count" });
+  }
+});
+
+// Add custom words API endpoint (admin only - would need auth in production)
+app.post("/api/words/custom", async (req, res) => {
+  try {
+    const { words, difficulty } = req.body;
+
+    if (!words || !Array.isArray(words)) {
+      return res.status(400).json({ error: "Invalid words array" });
+    }
+
+    const WordService = (await import("./services/WordService.js")).default;
+    const wordService = new WordService();
+    const success = await wordService.addCustomWords(
+      words,
+      difficulty || "medium"
+    );
+
+    if (success) {
+      res.json({ message: "Words added successfully", count: words.length });
+    } else {
+      res.status(500).json({ error: "Failed to add words" });
+    }
+  } catch (error) {
+    logger.error("Error adding custom words", { error: error.message });
+    res.status(500).json({ error: "Failed to add custom words" });
+  }
 });
 
 const gameService = new GameService();
@@ -436,12 +490,47 @@ io.on("connection", (socket) => {
     const { gameId } = data;
 
     try {
-      const game = gameManager.togglePlayerReady(gameId, socket.id);
+      const game = gameService.togglePlayerReady(gameId, socket.id);
       if (game) {
         io.to(gameId).emit("game-update", game);
       }
     } catch (error) {
-      console.error("Error toggling ready status:", error);
+      logger.error("Error toggling ready status", { error: error.message });
+    }
+  });
+
+  socket.on("kick-player", (data) => {
+    const { gameId, targetPlayerId } = data;
+
+    try {
+      const updatedGame = gameService.kickPlayer(
+        gameId,
+        socket.id,
+        targetPlayerId
+      );
+
+      if (updatedGame) {
+        // Notify the kicked player
+        io.to(targetPlayerId).emit("kicked", {
+          message: "You have been removed from the game by the room owner",
+        });
+
+        // Notify all players
+        io.to(gameId).emit("player-kicked", {
+          playerId: targetPlayerId,
+        });
+
+        io.to(gameId).emit("game-update", updatedGame);
+
+        logger.info("Player kicked", {
+          gameId,
+          targetPlayerId,
+          kickedBy: socket.id,
+        });
+      }
+    } catch (error) {
+      logger.error("Error kicking player", { error: error.message });
+      socket.emit("error", { message: error.message });
     }
   });
 });
