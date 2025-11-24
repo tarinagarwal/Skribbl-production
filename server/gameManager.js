@@ -1,11 +1,23 @@
 import { v4 as uuidv4 } from "uuid";
 import { getDatabase, checkDatabaseHealth } from "./database.js";
+import { sanitizeGameForPlayer } from "./utils/gameSanitizer.js";
 
 class GameManager {
   constructor() {
     this.games = new Map();
     this.timers = new Map();
     this.hintTimers = new Map();
+  }
+
+  // Helper method to broadcast sanitized game updates
+  broadcastGameUpdate(io, gameId, game) {
+    if (!io || !game) return;
+
+    // Send personalized game state to each player
+    game.players.forEach((player) => {
+      const sanitizedGame = sanitizeGameForPlayer(game, player.id);
+      io.to(player.id).emit("game-update", sanitizedGame);
+    });
   }
 
   async createGame(roomCode, settings = {}) {
@@ -258,7 +270,7 @@ class GameManager {
 
       // Emit time update
       if (io) {
-        io.to(gameId).emit("game-update", game);
+        this.broadcastGameUpdate(io, gameId, game);
         io.to(gameId).emit("timer-update", { timeLeft });
       }
 
@@ -307,7 +319,7 @@ class GameManager {
 
       // Emit time update
       if (io) {
-        io.to(gameId).emit("game-update", game);
+        this.broadcastGameUpdate(io, gameId, game);
         io.to(gameId).emit("timer-update", { timeLeft });
       }
 
@@ -320,7 +332,7 @@ class GameManager {
           const updatedGame = this.games.get(gameId);
           if (io) {
             io.to(gameId).emit("next-turn", updatedGame);
-            io.to(gameId).emit("game-update", updatedGame);
+            this.broadcastGameUpdate(io, gameId, updatedGame);
           }
         } catch (error) {
           console.error("Error in draw timer next turn:", error);
