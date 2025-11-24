@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Clock, Trophy, Users, Eye, Pencil } from "lucide-react";
+import { Clock, Trophy, Users, Eye, Pencil, Settings } from "lucide-react";
 import { Game, User, DrawingData, ChatMessage } from "../types/game";
 import DrawingCanvas from "./DrawingCanvas";
 import ChatBox from "./ChatBox";
 import WordChoice from "./WordChoice";
 import RoundEndScreen from "./RoundEndScreen";
+import SettingsModal from "./SettingsModal";
 import soundManager from "../utils/sounds";
 
 interface GameBoardProps {
@@ -33,6 +34,7 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(
   }) => {
     const isDrawer = currentUser?.id === game.currentDrawer?.id;
     const lastTimeRef = useRef(game.timeLeft);
+    const [showSettings, setShowSettings] = useState(false);
 
     // Use server-provided time directly
     const timeLeft = game.timeLeft;
@@ -78,6 +80,11 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(
 
     return (
       <>
+        <SettingsModal
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
+        />
+
         {showRoundEnd &&
           game.currentWord &&
           game.currentDrawer &&
@@ -127,6 +134,17 @@ const GameBoard: React.FC<GameBoardProps> = React.memo(
                       Round {game.round}/{game.maxRounds}
                     </span>
                   </div>
+
+                  <button
+                    onClick={() => setShowSettings(true)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Settings"
+                  >
+                    <Settings
+                      size={16}
+                      className="sm:w-5 sm:h-5 text-gray-600"
+                    />
+                  </button>
                 </div>
 
                 <div className="text-center">
