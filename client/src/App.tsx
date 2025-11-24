@@ -101,13 +101,15 @@ function App() {
       });
     });
 
+    // Clear canvas is now handled through drawing event with action: "clear"
+    // Keeping this for backward compatibility
     socket.on("clear-canvas", () => {
-      console.log("Received clear canvas event");
+      console.log("Received clear canvas event (legacy)");
       setGame((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
-          drawingData: [],
+          drawingData: [{ action: "clear" }],
         };
       });
     });
